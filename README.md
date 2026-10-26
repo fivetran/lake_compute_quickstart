@@ -90,8 +90,8 @@ The first build takes about 5 minutes and creates 19 models in two new schemas,
 `quickstart_stg_fivetran_platform` and `quickstart_fivetran_platform`. Later builds can drop
 `--threads 1` and take about 3 minutes.
 
-Lake Compute estimates cost at **$3 per TB scanned**. `lc.py cost` reads its own record of every query
-in the build.
+`lc.py cost` shows Lake Compute's estimated cost for the build, from its own record of every query, next
+to a rough estimate for running the same build on a typical cloud data warehouse.
 
 ### 6. Query it yourself with DuckDB
 DuckDB needs read access to your catalog. In the Fivetran dashboard, open your destination's page,

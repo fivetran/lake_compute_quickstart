@@ -261,13 +261,14 @@ td.json { font-family: var(--f-mono); color: var(--muted); white-space: normal; 
 
     <div class="sec">
       <h3>What it cost</h3>
-      <p>Lake Compute keeps its own record of every query in the build. You pay for the data each query scans, about $3 per TB. No warehouse sits idle.</p>
+      <p>Lake Compute keeps its own record of every query in the build and estimates its cost. You pay for the data each query scans, and nothing sits idle between builds.</p>
       <div class="stats">
         <div class="stat"><span class="v">2m 51s</span><span class="l">build time, 19 models</span></div>
-        <div class="stat"><span class="v">46</span><span class="l">queries on Lake Compute</span></div>
-        <div class="stat"><span class="v">1.8 GB</span><span class="l">data scanned</span></div>
-        <div class="stat cost"><span class="tbd">$3 per TB scanned</span><span class="v">$0.0054</span><span class="l">estimated compute cost</span></div>
+        <div class="stat"><span class="v">1.8 GB</span><span class="l">data scanned, 46 queries</span></div>
+        <div class="stat"><span class="v">≈ $0.19</span><span class="l">same build on a typical cloud data warehouse</span></div>
+        <div class="stat cost"><span class="tbd">Estimate</span><span class="v">$0.0054</span><span class="l">estimated cost on Lake Compute</span></div>
       </div>
+      <p class="tabnote">Warehouse estimate: smallest size at about $3 per hour, billed while running plus a minute before it suspends, assuming the build takes as long as it did here.</p>
       <div class="bars" aria-label="Slowest models">
         <div class="eyebrow">Slowest models</div>
         <div class="bar"><span class="nm">stg_fivetran_platform__log_tmp</span><span class="tr"><i style="width:100%"></i></span><span class="s">2m 18s</span></div>

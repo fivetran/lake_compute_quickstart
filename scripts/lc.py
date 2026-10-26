@@ -362,9 +362,16 @@ def preflight(package="fivetran_log"):
     project.write_text(text)
 
 
+# Rough comparison with a typical cloud data warehouse: billed per second while it runs, using the smallest
+# size at about $3 per hour, and kept running for a minute after the last query before it suspends.
+# Assumes the build takes as long there as it did on Lake Compute.
+WAREHOUSE_USD_PER_HOUR = 3.00
+WAREHOUSE_IDLE_SECONDS = 60
+
+
 def cost():
-    """Lake Compute's own record of the last build: queries, bytes scanned and estimated cost
-    (lakecompute_information_schema.jobs, estimated at $3 per TB scanned)."""
+    """Lake Compute's own record of the last build (lakecompute_information_schema.jobs): queries, bytes
+    scanned and estimated cost, next to a rough estimate for a typical cloud data warehouse."""
     load_env()
     rr = ROOT / "target" / "run_results.json"
     if not rr.exists():
@@ -388,7 +395,10 @@ def cost():
     print(f"build {run_id}: {built} models in {int(elapsed) // 60}m {int(elapsed) % 60}s")
     print(f"queries on Lake Compute: {queries}  (bytes recorded for {measured})")
     print(f"data scanned: {int(float(scanned)) / 1e9:.3f} GB")
-    print(f"estimated cost: ${float(usd):.6f}  (Lake Compute's estimate, $3 per TB scanned)")
+    print(f"estimated cost on Lake Compute: ${float(usd):.6f}")
+    warehouse = (elapsed + WAREHOUSE_IDLE_SECONDS) / 3600 * WAREHOUSE_USD_PER_HOUR
+    print(f"same build on a typical cloud data warehouse: about ${warehouse:.2f}  (smallest size at about "
+          f"${WAREHOUSE_USD_PER_HOUR:.0f}/hour, billed while running plus {WAREHOUSE_IDLE_SECONDS}s before it suspends)")
 
 
 # ---- Step 6: DuckDB --------------------------------------------------------------------------------

@@ -78,7 +78,8 @@ real data without touching business data.
    happens anyway, rerun. Later builds can drop `--threads 1` (about 3 minutes).
    Expect 19 models and 8 tests, in schemas `quickstart_stg_fivetran_platform` and `quickstart_fivetran_platform`.
 6. `python3 scripts/lc.py cost` shows Lake Compute's own record of the build: queries, data scanned,
-   and estimated cost ($3 per TB scanned). Run it straight after the build, before any other dbt command.
+   and estimated cost, next to a rough estimate for the same build on a typical cloud data warehouse.
+   Run it straight after the build, before any other dbt command.
 
 ## Step 6: Query it yourself with DuckDB
 DuckDB reads the results straight from the lake, with no Fivetran or dbt in between. That shows the
@@ -100,7 +101,7 @@ Use `./bin/lake -c "<sql>"` and show the output.
    `select connection_name, connector_type, connection_health, last_successful_sync_completed_at from lake.quickstart_fivetran_platform.fivetran_platform__connection_status order by connection_health, connection_name limit 10`
 3. Tell them what else was built: `connection_daily_events`, `mar_table_history`, `usage_history`,
    `audit_table`, `audit_user_activity`, `schema_changelog`, each documented in the package.
-4. Repeat the cost from step 5.
+4. Repeat the cost comparison from step 5.
 5. Point them to "Read it from anywhere" in `README.md` for Snowflake, Python, Spark and Trino.
 
 **Results look one sync behind.** The Fivetran Platform connector records each sync during the next
