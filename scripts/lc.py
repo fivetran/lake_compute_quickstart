@@ -3,6 +3,8 @@
 
 Every command works from any folder: it changes to the quickstart folder (the one holding .env) first.
 
+          python3 scripts/lc.py dashboard                progress page in your browser: every check below, live
+
   Step 0  python3 scripts/lc.py verify-key               who owns the Fivetran key, which account
           python3 scripts/lc.py destinations             Managed Data Lake destinations, Lake Compute on/off
           python3 scripts/lc.py use-destination <id>     saves the destination's details to .env
@@ -382,9 +384,10 @@ def cost():
         die("the last dbt command wasn't a build (run_results.json has no models). "
             "Run `python3 scripts/lc.py cost` right after `./bin/dbtw build`.")
     run_id = results.get("metadata", {}).get("invocation_id")
-    elapsed = results.get("elapsed_time", 0)
-    built = sum(1 for r in results["results"] if r.get("unique_id", "").startswith("model.")
-                and r.get("status") == "success")
+    rows = results["results"]
+    elapsed = results.get("elapsed_time") or sum(r.get("execution_time") or 0 for r in rows)
+    kind = lambda r: r.get("unique_id", "").split(".")[0]  # noqa: E731
+    built = sum(1 for r in rows if kind(r) == "model" and r.get("status") == "success")
     sql = ("select 'COST:' || count(*) || ',' || count(bytes_scanned) || ',' || coalesce(sum(bytes_scanned), 0)"
            " || ',' || coalesce(sum(estimated_cost_usd), 0) as c from lakecompute_information_schema.jobs"
            f" where dbt_run_id = '{run_id}'")
@@ -399,6 +402,16 @@ def cost():
     warehouse = (elapsed + WAREHOUSE_IDLE_SECONDS) / 3600 * WAREHOUSE_USD_PER_HOUR
     print(f"same build on a typical cloud data warehouse: about ${warehouse:.2f}  (smallest size at about "
           f"${WAREHOUSE_USD_PER_HOUR:.0f}/hour, billed while running plus {WAREHOUSE_IDLE_SECONDS}s before it suspends)")
+    # Snapshot for the progress page (scripts/dashboard.py). Later dbt commands overwrite run_results.json.
+    slowest = sorted((r for r in rows if kind(r) == "model"), key=lambda r: -(r.get("execution_time") or 0))[:5]
+    (ROOT / "target" / "quickstart_build.json").write_text(json.dumps({
+        "run_id": run_id, "elapsed": elapsed, "models_ok": built,
+        "models_failed": sum(1 for r in rows if kind(r) == "model" and r.get("status") != "success"),
+        "tests_passed": sum(1 for r in rows if kind(r) == "test" and r.get("status") == "pass"),
+        "tests_failed": sum(1 for r in rows if kind(r) == "test" and r.get("status") in ("fail", "error")),
+        "queries": int(queries), "bytes": int(float(scanned)), "usd": float(usd), "warehouse_usd": warehouse,
+        "slowest": [[r["unique_id"].split(".")[-1], round(r.get("execution_time") or 0, 1)] for r in slowest],
+    }, indent=2))
 
 
 # ---- Step 6: DuckDB --------------------------------------------------------------------------------
@@ -457,6 +470,7 @@ COMMANDS = {
     "cost": lambda args: cost(),
     "install-duckdb": lambda args: install_duckdb(),
     "duckdb-check": lambda args: duckdb_check(),
+    "dashboard": lambda args: __import__("dashboard").main(),
 }
 
 if __name__ == "__main__":

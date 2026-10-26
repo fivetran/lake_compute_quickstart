@@ -23,6 +23,12 @@ the two in step.
   `dbt build`.
 - The user is evaluating the product. Explain what each step does in a sentence or two.
 
+## Progress page
+`python3 scripts/lc.py dashboard` serves a local checklist page with the same checks and buttons for
+the installs, the sync and the build. Offer it to the user at the start: ask them to run it in a
+separate terminal (it keeps running), or start it yourself in the background and give them the link
+it prints. You and the page read the same state, so a check you run and the page's Re-check agree.
+
 ## Prerequisites (the user has these before starting)
 - A Fivetran account.
 - A Managed Data Lake destination in it.
