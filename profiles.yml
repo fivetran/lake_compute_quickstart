@@ -1,0 +1,15 @@
+# Lake Compute only: no warehouse. Models build on Fivetran Lake Compute and are written back to your
+# Managed Data Lake as Iceberg tables. Always run dbt through ./bin/dbtw, which loads .env and passes --profiles-dir .
+lake_compute_quickstart:
+  target: dev
+  outputs:
+    dev:
+      type: lakecompute
+      method: fivetran
+      fivetran_credential: "{{ env_var('LAKE_COMPUTE_TOKEN') }}"
+      # Required with today's dbt Fusion releases: without base_url, Fusion crashes at startup
+      # (Option::unwrap on None) when Lake Compute is the only adapter. This is the default service URL.
+      base_url: "https://api.lake-compute.fivetran.com/"
+      database: "{{ env_var('LC_CATALOG') }}"
+      schema: quickstart
+      threads: 4

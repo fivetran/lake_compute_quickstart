@@ -1,0 +1,29 @@
+name: lake_compute_quickstart
+version: "1.0.0"
+config-version: 2
+profile: lake_compute_quickstart
+
+model-paths: ["models"]
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  fivetran_log:
+    +materialized: table
+    +schema: fivetran_platform
+    staging:
+      +schema: stg_fivetran_platform
+
+vars:
+  # Where the Fivetran Platform connector lands in your lake.
+  # Lake Compute addresses the lake by its Polaris catalog name.
+  fivetran_platform_database: "{{ env_var('LC_CATALOG') }}"
+  fivetran_platform_schema: "{{ env_var('LOG_SCHEMA') }}"
+
+  # Optional source tables. `python3 scripts/lc.py preflight` sets each one from the tables your Fivetran Platform
+  # connector actually has. Which ones exist depends on the account. Don't edit these by hand.
+  fivetran_platform_using_transformations: false      # transformation_runs
+  fivetran_platform__credits_pricing: false           # credits_used
+  fivetran_platform__usage_pricing: false             # usage_cost
+  fivetran_platform_using_destination_membership: false  # destination_membership
+  fivetran_platform_using_user: true                  # user
+  fivetran_platform_using_connection: true            # connection

@@ -1,0 +1,15 @@
+# Secrets
+.env
+
+# dbt
+target/
+dbt_packages/
+logs/
+package-lock.yml
+
+# Binaries the quickstart downloads into this folder
+bin/dbt
+bin/duckdb
+
+.venv/
+.DS_Store

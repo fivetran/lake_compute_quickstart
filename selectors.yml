@@ -1,0 +1,7 @@
+# One selector per connector. Always build through a selector, never an unselected `dbt build`.
+selectors:
+  - name: fivetran_log
+    description: Fivetran Platform (log) package
+    definition:
+      method: package
+      value: fivetran_log

@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Open DuckDB connected straight to your lake's Iceberg catalog, as `lake`. No Fivetran or dbt involved.
+#   ./bin/lake                         interactive SQL prompt
+#   ./bin/lake -c "select ..."         run one query
+# Example: select * from lake.quickstart_fivetran_platform.fivetran_platform__connection_status;
+# The catalog secret is read from the environment inside DuckDB (getenv), so it never appears in a
+# command line or a file other than .env.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+[ -f .env ] || { echo "ERROR: .env not found. Copy .env.example to .env first." >&2; exit 1; }
+while IFS= read -r line || [ -n "$line" ]; do
+  case "$line" in ''|\#*) continue ;; esac
+  key="${line%%=*}"; val="${line#*=}"
+  val="${val%\"}"; val="${val#\"}"; val="${val%\'}"; val="${val#\'}"
+  [[ "$key" =~ ^[A-Z_][A-Z0-9_]*$ ]] && export "$key=$val"
+done < .env
+for k in LC_CATALOG POLARIS_ENDPOINT POLARIS_CLIENT_ID POLARIS_CLIENT_SECRET; do
+  [ -n "${!k:-}" ] || { echo "ERROR: $k is empty in .env." >&2; exit 1; }
+done
+case "$LC_CATALOG$POLARIS_ENDPOINT" in *"'"*) echo "ERROR: unexpected quote in LC_CATALOG or POLARIS_ENDPOINT." >&2; exit 1 ;; esac
+if [ -x ./bin/duckdb ]; then duckdb=./bin/duckdb; else duckdb="$(command -v duckdb || true)"; fi
+[ -n "$duckdb" ] || { echo "ERROR: DuckDB not found. Run: python3 scripts/lc.py install-duckdb" >&2; exit 1; }
+exec "$duckdb" -init scripts/lake.sql \
+  -cmd "ATTACH '${LC_CATALOG}' AS lake (TYPE iceberg, ENDPOINT '${POLARIS_ENDPOINT%/}', SECRET polaris);" "$@"
