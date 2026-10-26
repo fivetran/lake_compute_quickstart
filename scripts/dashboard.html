@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lake Compute Quickstart</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: the checklist on the left, the selected step on the right; results open below once the build passes. */
+:root {
+  --bg: #f3f6f7; --surface: #ffffff; --sunk: #e8eef0; --fg: #142a33; --muted: #557079; --line: #d3dee2;
+  --accent: #0f5f80; --accent-soft: #dcecf3;
+  --ok: #1d7a4c; --ok-soft: #ddf1e6; --need: #b3261e; --need-soft: #fbe3e0;
+  --warn: #8a5a00; --warn-soft: #fbefd5; --wait: #7a8c92; --wait-soft: #e7ecee;
+  --code-bg: #0f2129; --code-fg: #d6e6ec; --code-dim: #7d9aa5;
+  --f-display: "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #0b171c; --surface: #11222a; --sunk: #0e1c22; --fg: #dce9ee; --muted: #8aa4ad; --line: #22404b;
+  --accent: #5fb3d6; --accent-soft: #143545;
+  --ok: #5ccf92; --ok-soft: #12352a; --need: #ff8a80; --need-soft: #3d1a19;
+  --warn: #e9b44c; --warn-soft: #3a2c10; --wait: #7f969e; --wait-soft: #18292f;
+  --code-bg: #071015; --code-fg: #d6e6ec; --code-dim: #6f8b95; color-scheme: dark; } }
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.55 var(--f-body); }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 24px 16px 56px; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; line-height: 1.2; }
+h1 { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 1.3rem; font-weight: 700; }
+h3 { font-size: 1rem; font-weight: 500; }
+p { margin: 0; }
+code, pre, .mono { font-family: var(--f-mono); }
+code { font-size: 0.86em; background: var(--sunk); padding: 1px 5px; border-radius: 4px; }
+.eyebrow { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+button { font: inherit; cursor: pointer; }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a { color: var(--accent); }
+
+header.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; margin-bottom: 22px; }
+header.top .sub { color: var(--muted); margin-top: 4px; }
+.env { display: flex; flex-wrap: wrap; gap: 6px; }
+.env span { font-family: var(--f-mono); font-size: 0.78rem; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; color: var(--muted); }
+.env b { color: var(--fg); font-weight: 500; }
+
+.progress { height: 6px; background: var(--sunk); border-radius: 999px; overflow: hidden; margin-bottom: 22px; }
+.progress i { display: block; height: 100%; background: var(--ok); width: 0; transition: width .35s ease; }
+
+.grid { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 820px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+.rail { display: flex; flex-direction: column; gap: 6px; }
+.step { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 10px; align-items: center; text-align: left; width: 100%; background: transparent; border: 1px solid transparent; border-radius: 10px; padding: 10px 12px; color: var(--fg); }
+.step:hover { background: var(--surface); border-color: var(--line); }
+.step[aria-current="true"] { background: var(--surface); border-color: var(--accent); }
+.step .ico { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 0.8rem; font-weight: 700; font-family: var(--f-mono); }
+.step .t { font-weight: 500; line-height: 1.3; }
+.step .w { display: block; font-size: 0.78rem; color: var(--muted); }
+.pill { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+.s-done .ico, .pill.done { background: var(--ok-soft); color: var(--ok); }
+.s-need .ico, .pill.need { background: var(--need-soft); color: var(--need); }
+.s-ready .ico, .pill.ready, .s-checking .ico, .pill.checking, .s-running .ico, .pill.running { background: var(--accent-soft); color: var(--accent); }
+.s-wait .ico, .pill.wait { background: var(--wait-soft); color: var(--wait); }
+.s-wait .t { color: var(--muted); }
+.s-checking .ico, .s-running .ico { animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .45; } }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 24px; min-width: 0; display: flex; flex-direction: column; gap: 18px; }
+.panel-head { display: flex; gap: 12px; align-items: start; justify-content: space-between; flex-wrap: wrap; }
+.who { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+.lead { max-width: 64ch; }
+ol.do { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 8px; max-width: 70ch; }
+ol.do li::marker { color: var(--muted); font-family: var(--f-mono); font-size: 0.85em; }
+.path { font-weight: 500; }
+.path span { color: var(--muted); padding: 0 4px; }
+
+pre.cmd { margin: 0; background: var(--code-bg); color: var(--code-fg); border-radius: 10px; padding: 14px 16px; font-size: 0.82rem; line-height: 1.6; overflow-x: auto; position: relative; white-space: pre; }
+pre.cmd .c { color: var(--code-dim); }
+pre.log { max-height: 340px; overflow: auto; font-size: 0.76rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.copy { position: absolute; top: 8px; right: 8px; background: var(--code-bg); color: var(--code-dim); border: 1px solid var(--code-dim); border-radius: 6px; font-size: 0.72rem; padding: 2px 8px; }
+
+.check { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.check-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--sunk); padding: 8px 12px; font-size: 0.82rem; }
+.check-head .mono { color: var(--muted); font-size: 0.78rem; }
+.check ul { list-style: none; margin: 0; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 0.88rem; }
+.check li { display: grid; grid-template-columns: 18px minmax(0,1fr); gap: 8px; overflow-wrap: anywhere; }
+.check li .m { font-weight: 700; }
+.check li.ok .m { color: var(--ok); } .check li.no .m { color: var(--need); } .check li.info .m { color: var(--wait); }
+.check li .d { color: var(--muted); }
+
+.choices { display: flex; flex-direction: column; gap: 8px; }
+.choice { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.choice .mono { font-size: 0.8rem; color: var(--muted); }
+
+.note { font-size: 0.86rem; background: var(--accent-soft); border-radius: 8px; padding: 10px 12px; max-width: 72ch; }
+.note.warn { background: var(--warn-soft); }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn { border-radius: 8px; padding: 8px 16px; font-weight: 600; border: 1px solid var(--accent); background: var(--accent); color: var(--surface); }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn.small { padding: 4px 12px; font-size: 0.85rem; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.results { margin-top: 34px; display: flex; flex-direction: column; gap: 28px; }
+.results-head p { color: var(--muted); max-width: 70ch; margin-top: 4px; }
+.sec { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.sec > p { color: var(--muted); max-width: 72ch; }
+.ba { display: grid; grid-template-columns: minmax(0,1fr) 40px minmax(0,1fr); gap: 12px; align-items: stretch; }
+.ba .arrow { display: grid; place-items: center; color: var(--accent); font-size: 1.4rem; font-family: var(--f-mono); }
+@media (max-width: 900px) { .ba { grid-template-columns: minmax(0,1fr); } .ba .arrow { transform: rotate(90deg); height: 28px; } }
+.side { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.side-head { padding: 10px 12px; background: var(--sunk); display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+.side-head .mono { font-size: 0.78rem; overflow-wrap: anywhere; }
+.side-head .n { font-size: 0.75rem; color: var(--muted); }
+.tbl { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: top; }
+th { font-family: var(--f-mono); font-weight: 500; color: var(--muted); font-size: 0.72rem; }
+td.json { font-family: var(--f-mono); color: var(--muted); white-space: normal; }
+td.json div { width: 230px; overflow-wrap: anywhere; }
+.side-foot { padding: 10px 12px; font-size: 0.82rem; color: var(--muted); margin-top: auto; }
+.h-ok { color: var(--ok); font-weight: 600; } .h-bad { color: var(--need); font-weight: 600; } .h-warn { color: var(--warn); font-weight: 600; }
+
+.lineage { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; }
+@media (max-width: 820px) { .lineage { grid-template-columns: minmax(0,1fr); } }
+.col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.col h3 { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; font-size: 0.9rem; }
+.col h3 span { font-family: var(--f-mono); font-size: 0.72rem; color: var(--muted); font-weight: 400; overflow-wrap: anywhere; text-align: right; }
+.node { font-family: var(--f-mono); font-size: 0.76rem; background: var(--sunk); border-radius: 6px; padding: 5px 8px; overflow-wrap: anywhere; }
+.node.final { background: var(--accent-soft); font-weight: 500; }
+.node.final small { display: block; font-family: var(--f-body); font-weight: 400; color: var(--muted); font-size: 0.76rem; margin-top: 2px; }
+.more { font-size: 0.76rem; color: var(--muted); padding-left: 8px; }
+
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
+@media (max-width: 820px) { .stats { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+.stat { border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 2px; }
+.stat .v { font-family: var(--f-display); font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stat .l { font-size: 0.8rem; color: var(--muted); }
+.stat.cost { border-color: var(--accent); }
+.bars { display: flex; flex-direction: column; gap: 5px; }
+.bar { display: grid; grid-template-columns: minmax(0, 280px) minmax(0,1fr) 56px; gap: 10px; align-items: center; font-size: 0.76rem; }
+.bar .nm { font-family: var(--f-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar .tr { height: 8px; background: var(--sunk); border-radius: 999px; overflow: hidden; }
+.bar .tr i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.bar .s { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+.tab { background: transparent; border: 0; border-bottom: 2px solid transparent; padding: 8px 12px; color: var(--muted); font-weight: 500; margin-bottom: -1px; }
+.tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.tabnote { font-size: 0.84rem; color: var(--muted); max-width: 72ch; }
+.loading { color: var(--muted); font-size: 0.9rem; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">Fivetran Lake Compute</div>
+      <h1>Lake Compute Quickstart</h1>
+      <p class="sub">Transform your Fivetran data where it lives, with dbt Fusion on your laptop and no warehouse.</p>
+    </div>
+    <div class="env" id="env" aria-label="Settings"></div>
+  </header>
+
+  <div class="progress" aria-hidden="true"><i id="prog"></i></div>
+
+  <div class="grid">
+    <nav class="rail" id="rail" aria-label="Setup steps"></nav>
+    <section class="panel" id="panel" aria-live="polite"></section>
+  </div>
+
+  <section class="results" id="results" hidden></section>
+</div>
+
+<script>
+const TOKEN = '__QUICKSTART_TOKEN__';
+const DOCS = 'https://docs.getdbt.com/docs/local/install-dbt?version=2';
+let ENV = {};
+
+const STEPS = [
+  { key: 'prereqs', title: 'Prerequisites', who: 'You',
+    lead: () => 'A Fivetran account, a Managed Data Lake destination, and your Fivetran API key and secret in <code>.env</code>.',
+    todo: () => ['In the Fivetran dashboard, open your user menu and choose <span class="path">API key</span>. Generate a key and secret.',
+                 'Open <code>.env</code> in this folder in your editor. Fill in <code>FIVETRAN_API_KEY</code> and <code>FIVETRAN_API_SECRET</code>, and save.',
+                 'Click <b>Re-check</b>, then pick your destination.'],
+    note: 'Type secrets into <code>.env</code> in your editor. Never paste them into a chat or a terminal.' },
+  { key: 'fusion', title: 'Install dbt Fusion', who: 'You or your AI assistant',
+    lead: () => `dbt Fusion is the dbt engine that can send models to Lake Compute. Install it the way the <a href="${DOCS}" target="_blank" rel="noopener">dbt docs</a> describe. You don't need <code>dbt login</code>: this quickstart doesn't use the dbt platform.`,
+    code: '<span class="c"># macOS and Linux, in a terminal</span>\ncurl -fsSL https://public.cdn.getdbt.com/fs/install/install.sh | sh -s -- --update\nexec $SHELL',
+    note: 'Already have a <code>dbt</code> you\'d rather not replace? <b>Install into this folder</b> puts Fusion in <code>./bin</code> instead.',
+    extra: [{ action: 'install-fusion', label: 'Install into this folder' }] },
+  { key: 'lake_compute', title: 'Turn on Lake Compute', who: 'You, in the Fivetran dashboard',
+    lead: () => 'Lake Compute runs your dbt models next to your data lake. Turn it on for your destination.',
+    todo: () => [`Open <span class="path">Destinations<span>›</span>${dest()}</span> in the Fivetran dashboard.`,
+                 'Find the <span class="path">Lake Compute</span> setting and switch it on.',
+                 'Come back here and click <b>Re-check</b>.'] },
+  { key: 'token', title: 'Lake Compute token', who: 'You, in the Fivetran dashboard',
+    lead: () => 'dbt uses this token to send work to Lake Compute. It belongs to this one destination.',
+    todo: () => [`On the same page, <span class="path">Destinations<span>›</span>${dest()}<span>›</span>Lake Compute</span>, generate a token.`,
+                 'Paste it into <code>LAKE_COMPUTE_TOKEN</code> in <code>.env</code> and save. It starts with <code>dct_</code>.',
+                 'Click <b>Re-check</b>.'],
+    note: 'The check reads the token from <code>.env</code> and never shows it.' },
+  { key: 'log', title: 'Fivetran Platform connector', who: 'You, in the Fivetran dashboard',
+    lead: () => 'This free connector syncs your account\'s own activity: syncs, errors, usage and changes. It gives the demo real data without touching your business data. If one already syncs into this destination, the quickstart uses it.',
+    todo: () => ['Already have one in this destination? Click <b>Re-check</b>.',
+                 `Otherwise open <span class="path">Connectors<span>›</span>Add connector</span>, choose <span class="path">Fivetran Platform</span>, and pick destination <b>${dest()}</b>.`,
+                 'Let its first sync finish, then click <b>Re-check</b>. Or click <b>Sync now</b> to start one and wait for it here.'],
+    extra: [{ action: 'sync-log', label: 'Sync now' }] },
+  { key: 'build', title: 'Build on Lake Compute', who: 'You or your AI assistant', tool: true,
+    lead: () => 'Runs the Fivetran Platform dbt package. dbt Fusion compiles each model on your laptop, and Lake Compute runs the SQL next to your lake and writes the results back as Iceberg tables.',
+    code: '<span class="c"># what Run build does</span>\n./bin/dbtw deps\n./bin/dbtw parse\npython3 scripts/lc.py preflight\n./bin/dbtw build --selector fivetran_log\npython3 scripts/lc.py cost',
+    note: 'Takes about 3 minutes. Most of that is one large model that reads every log event.',
+    primary: { action: 'build', label: 'Run build' } },
+  { key: 'duckdb', title: 'Query it yourself with DuckDB', who: 'You, then your AI assistant',
+    lead: () => 'DuckDB is a free, open source SQL engine that runs on your laptop. It reads the results straight from your lake, with no Fivetran or dbt in between. That shows they\'re open Iceberg tables you own.',
+    todo: () => [`Open <span class="path">Destinations<span>›</span>${dest()}</span> in the Fivetran dashboard and copy the <b>read-only</b> catalog client secret.`,
+                 'Paste it into <code>POLARIS_CLIENT_SECRET</code> in <code>.env</code> and save. The catalog address and client ID are already there.',
+                 'Click <b>Install DuckDB</b> if you don\'t have it, then <b>Re-check</b>.'],
+    code: '<span class="c"># afterwards, a SQL prompt connected to your lake</span>\n./bin/lake',
+    note: 'Read-only is all this needs, and you don\'t have to be a destination admin to see it.',
+    extra: [{ action: 'install-duckdb', label: 'Install DuckDB' }] },
+];
+const S = STEPS.map(() => ({ state: 'wait', rows: [] }));
+const JOBS = {};  // step index -> {id, lines, done, rc}
+const PILLS = { done: 'Done', need: 'Need to do', ready: 'Ready', wait: 'Waiting', checking: 'Checking', running: 'Running' };
+const ICONS = { done: '✓', need: '!', ready: '▶', checking: '…', running: '…' };
+let current = 0;
+
+const dest = () => ENV.FIVETRAN_GROUP_ID ? `<b>${esc(ENV.FIVETRAN_GROUP_ID)}</b>` : 'your Managed Data Lake destination';
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+async function api(path, body) {
+  const r = await fetch(path, { method: body === undefined ? 'GET' : 'POST', headers: { 'X-Quickstart-Token': TOKEN, 'Content-Type': 'application/json' },
+                                body: body === undefined ? undefined : JSON.stringify(body) });
+  return r.json();
+}
+
+async function loadEnv() {
+  ENV = await api('/api/env');
+  const chips = [['destination', ENV.FIVETRAN_GROUP_ID], ['catalog', ENV.LC_CATALOG], ['region', ENV.MDLS_REGION], ['log schema', ENV.LOG_SCHEMA]]
+    .filter(([, v]) => v).map(([k, v]) => `<span>${k} <b>${esc(v)}</b></span>`);
+  document.getElementById('env').innerHTML = chips.join('') || '<span>not set up yet</span>';
+}
+
+// Check steps in order from `start`, stopping at the first one that isn't done.
+async function runFrom(start) {
+  for (let i = start; i < STEPS.length; i++) {
+    S[i] = { ...S[i], state: 'checking' };
+    if (i === start) current = i;
+    render();
+    const res = await api(`/api/check/${STEPS[i].key}`, {});
+    S[i] = { ...res, rows: res.rows || [] };
+    await loadEnv();
+    if (res.state !== 'done') {
+      current = i;
+      for (let j = i + 1; j < STEPS.length; j++) S[j] = { state: 'wait', rows: [] };
+      render();
+      return;
+    }
+    current = Math.min(i + 1, STEPS.length - 1);
+    render();
+  }
+  loadResults();
+}
+
+async function startAction(i, action) {
+  const res = await api(`/api/action/${action}`, {});
+  if (!res.job) { alertRow(i, res.error || 'Couldn\'t start.'); return; }
+  JOBS[i] = { id: res.job, lines: [], done: false };
+  S[i] = { ...S[i], state: 'running' };
+  render();
+  poll(i);
+}
+
+async function poll(i) {
+  const job = JOBS[i];
+  const res = await api(`/api/job/${job.id}?since=${job.lines.length}`);
+  job.lines.push(...res.lines);
+  job.done = res.done; job.rc = res.rc;
+  if (current === i) renderLog(i);
+  if (!res.done) { setTimeout(() => poll(i), 1000); return; }
+  if (STEPS[i].key === 'build') document.getElementById('results').hidden = true;
+  runFrom(i);
+}
+
+function alertRow(i, text) { S[i].rows = [...(S[i].rows || []), { kind: 'no', text }]; render(); }
+
+function render() {
+  const rail = document.getElementById('rail');
+  rail.innerHTML = STEPS.map((s, i) => `
+    <button type="button" class="step s-${S[i].state}" data-i="${i}" aria-current="${i === current}">
+      <span class="ico">${ICONS[S[i].state] || i}</span>
+      <span><span class="t">${s.title}</span><span class="w">${s.who}</span></span>
+      <span class="pill ${S[i].state}">${PILLS[S[i].state]}</span>
+    </button>`).join('') + `
+    <button type="button" class="step ${allDone() ? 's-ready' : 's-wait'}" id="to-results" ${allDone() ? '' : 'disabled'}>
+      <span class="ico">${allDone() ? '↓' : STEPS.length}</span>
+      <span><span class="t">See what changed</span><span class="w">Results, cost, and how to read them</span></span>
+      <span class="pill ${allDone() ? 'ready' : 'wait'}">${allDone() ? 'View' : 'Waiting'}</span></button>`;
+  rail.querySelectorAll('.step[data-i]').forEach(b => b.onclick = () => { current = +b.dataset.i; render(); });
+  const tr = document.getElementById('to-results');
+  if (allDone()) tr.onclick = () => document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+  document.getElementById('prog').style.width = (S.filter(x => x.state === 'done').length / STEPS.length * 100) + '%';
+  renderPanel();
+}
+
+const allDone = () => S.every(x => x.state === 'done');
+
+function renderPanel() {
+  const s = STEPS[current], st = S[current];
+  const busy = st.state === 'checking' || st.state === 'running' || Object.values(JOBS).some(j => !j.done);
+  const prev = S.slice(0, current).findIndex(x => x.state !== 'done');
+  const marks = { ok: '✓', no: '✕', info: '·' };
+  const rows = st.rows.length ? st.rows : [{ kind: 'info', text: st.state === 'wait' ? 'Not checked yet.' : 'Checking…' }];
+  const extras = (s.extra || []).map(x => `<button type="button" class="btn ${st.offer === x.action ? '' : 'ghost'}" data-action="${x.action}" ${busy ? 'disabled' : ''}>${x.label}</button>`).join('');
+  const primary = s.primary
+    ? `<button type="button" class="btn" data-action="${s.primary.action}" ${busy || prev !== -1 ? 'disabled' : ''}>${st.state === 'done' ? 'Build again' : s.primary.label}</button>`
+    : `<button type="button" class="btn" id="recheck" ${busy ? 'disabled' : ''}>Re-check</button>`;
+  document.getElementById('panel').innerHTML = `
+    <div class="panel-head">
+      <div><div class="eyebrow">Step ${current}</div><h2>${s.title}</h2><div class="who">${s.who}</div></div>
+      <span class="pill ${st.state}">${PILLS[st.state]}</span>
+    </div>
+    ${prev !== -1 && st.state === 'wait' ? `<div class="note warn">Finish <b>${STEPS[prev].title}</b> first.</div>` : ''}
+    <p class="lead">${s.lead()}</p>
+    ${s.todo ? `<ol class="do">${s.todo().map(t => `<li>${t}</li>`).join('')}</ol>` : ''}
+    ${s.code ? `<pre class="cmd"><button type="button" class="copy">Copy</button>${s.code}</pre>` : ''}
+    ${s.note ? `<div class="note">${s.note}</div>` : ''}
+    ${st.missing_env ? `<div class="actions"><button type="button" class="btn" id="create-env">Create .env</button></div>` : ''}
+    ${st.choices ? `<div class="choices">${st.choices.length ? st.choices.map(c => `
+      <div class="choice"><div><b>${esc(c.name || c.id)}</b><div class="mono">${esc(c.id)} · catalog ${esc(c.catalog)} · ${esc(c.region)} · Lake Compute ${esc(c.lake_compute)}</div></div>
+      <button type="button" class="btn small" data-dest="${esc(c.id)}">Use this</button></div>`).join('')
+      : '<div class="note warn">No Managed Data Lake destinations in this account. Create one in the Fivetran dashboard, then Re-check.</div>'}</div>` : ''}
+    <div class="check">
+      <div class="check-head"><b>Check</b><span class="mono">${s.key === 'build' ? 'reads the last build' : 'runs on your machine'}</span></div>
+      <ul>${rows.map(r => `<li class="${r.kind}"><span class="m">${marks[r.kind]}</span><span>${esc(r.text)}${r.detail ? ` <span class="d">· ${esc(r.detail)}</span>` : ''}</span></li>`).join('')}</ul>
+    </div>
+    <div class="actions">${primary}${extras}
+      ${st.state === 'done' && current < STEPS.length - 1 ? `<button type="button" class="btn ghost" id="next">Next step →</button>` : ''}</div>
+    <div id="logbox"></div>`;
+  const pre = document.querySelector('#panel pre.cmd');
+  if (pre) pre.querySelector('.copy').onclick = e => copyText(pre.innerText.replace(/^Copy\s*/, ''), e.target);
+  const rc = document.getElementById('recheck'); if (rc) rc.onclick = () => runFrom(current);
+  const nx = document.getElementById('next'); if (nx) nx.onclick = () => { current++; render(); };
+  const ce = document.getElementById('create-env');
+  if (ce) ce.onclick = async () => { await api('/api/create-env', {}); runFrom(0); };
+  document.querySelectorAll('#panel [data-action]').forEach(b => b.onclick = () => startAction(current, b.dataset.action));
+  document.querySelectorAll('#panel [data-dest]').forEach(b => b.onclick = async () => {
+    b.disabled = true; await api('/api/use-destination', { id: b.dataset.dest }); await loadEnv(); runFrom(0);
+  });
+  renderLog(current);
+}
+
+function renderLog(i) {
+  const box = document.getElementById('logbox');
+  const job = JOBS[i];
+  if (!box || !job) return;
+  const status = job.done ? (job.rc === 0 ? 'Finished' : 'Stopped with an error') : 'Running…';
+  box.innerHTML = `<div class="eyebrow" style="margin-bottom:6px">${status}</div><pre class="cmd log" id="log">${esc(job.lines.join('\n'))}</pre>`;
+  const log = document.getElementById('log'); log.scrollTop = log.scrollHeight;
+}
+
+function copyText(text, btn) {
+  const done = () => { const o = btn.textContent; btn.textContent = 'Copied'; setTimeout(() => btn.textContent = o, 1200); };
+  try { navigator.clipboard.writeText(text).then(done, () => {}); } catch (e) { /* select by hand */ }
+}
+
+// ---- results ----
+async function loadResults() {
+  const box = document.getElementById('results');
+  box.hidden = false;
+  box.innerHTML = '<div class="sec"><p class="loading">Loading your results. This runs a few queries against your lake…</p></div>';
+  const r = await api('/api/results');
+  if (r.error || !r.ready) { box.innerHTML = `<div class="sec"><p class="loading">Couldn't load results: ${esc(r.error || 'build not found')}</p></div>`; return; }
+  const b = r.build, n = x => Number(x || 0).toLocaleString();
+  const mins = s => s < 60 ? `${Math.round(s)}s` : `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
+  const max = Math.max(...b.slowest.map(x => x[1]), 1);
+  box.innerHTML = `
+    <div class="results-head"><div class="eyebrow">Step ${STEPS.length} · Results</div>
+      <h2>From raw sync logs to tables you can use</h2>
+      <p>Lake Compute ran the Fivetran Platform dbt package next to your lake and wrote the results back to it as Iceberg tables. Nothing left your storage, and no warehouse was running.</p></div>
+    <div class="sec"><h3>Before and after</h3>
+      <p>On the left is what Fivetran landed: one row per event, with the details packed into JSON. On the right is the modeled table: one row per connector, ready for a dashboard or an AI assistant. Read through ${esc(r.engine)}.</p>
+      <div class="ba">
+        <div class="side"><div class="side-head"><span class="mono">${esc(r.log_table)}</span><span class="n">raw · ${n(r.counts.log_rows)} rows · ${r.sources.length} tables</span></div>
+          <div class="tbl">${table(r.raw, ['message_data'])}</div>
+          <div class="side-foot">To answer "is this connector healthy?" you'd parse JSON across every event and join several tables.</div></div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div class="side"><div class="side-head"><span class="mono">${esc(r.status_table)}</span><span class="n">modeled · ${n(r.counts.status_rows)} rows</span></div>
+          <div class="tbl">${table(r.after, [], 'connection_health')}</div>
+          <div class="side-foot">One row per connector. Which connectors are broken is a single <code>select</code>.</div></div>
+      </div></div>
+    <div class="sec"><h3>What got built</h3>
+      <p>${b.models_ok} models from the Fivetran Platform package, each with documented columns. Those descriptions travel with the tables, which is what lets an AI assistant query them without guessing.</p>
+      <div class="lineage">
+        <div class="col"><h3>Raw source tables <span>${r.sources.length}</span></h3>${r.sources.slice(0, 6).map(x => `<div class="node">${esc(x)}</div>`).join('')}${r.sources.length > 6 ? `<div class="more">+ ${r.sources.length - 6} more</div>` : ''}</div>
+        <div class="col"><h3>Staging <span>${esc(r.staging_schema)} · ${r.staging.length}</span></h3>${r.staging.slice(0, 5).map(x => `<div class="node">${esc(x)}</div>`).join('')}${r.staging.length > 5 ? `<div class="more">+ ${r.staging.length - 5} more</div>` : ''}</div>
+        <div class="col"><h3>Ready to use <span>${esc(r.final_schema)} · ${r.final.length}</span></h3>${r.final.map(x => `<div class="node final">${esc(x.name)}<small>${esc(x.description)} ${x.columns ? `(${x.columns} documented columns)` : ''}</small></div>`).join('')}</div>
+      </div></div>
+    <div class="sec"><h3>What it cost</h3>
+      <p>Lake Compute keeps its own record of every query in the build and estimates its cost. You pay for the data each query scans, and nothing sits idle between builds.</p>
+      <div class="stats">
+        <div class="stat"><span class="v">${mins(b.elapsed)}</span><span class="l">build time, ${b.models_ok} models</span></div>
+        <div class="stat"><span class="v">${(b.bytes / 1e9).toFixed(2)} GB</span><span class="l">data scanned, ${b.queries} queries</span></div>
+        <div class="stat cost"><span class="v">$${b.usd < 0.01 ? b.usd.toFixed(4) : b.usd.toFixed(2)}</span><span class="l">estimated cost on Lake Compute</span></div>
+        <div class="stat"><span class="v">≈ $${b.warehouse_usd.toFixed(2)}</span><span class="l">same build on a typical cloud data warehouse</span></div>
+      </div>
+      <p class="tabnote">Warehouse estimate: smallest size at about $3 per hour, billed while running plus a minute before it suspends, assuming the build takes as long as it did here.</p>
+      <div class="bars"><div class="eyebrow">Slowest models</div>${b.slowest.map(([nm, s]) => `<div class="bar"><span class="nm">${esc(nm)}</span><span class="tr"><i style="width:${Math.max(2, s / max * 100)}%"></i></span><span class="s">${mins(s)}</span></div>`).join('')}</div></div>
+    <div class="sec"><h3>Read it from anywhere</h3>
+      <p>The results are open Iceberg tables in your catalog <code>${esc(ENV.LC_CATALOG)}</code>. Point any engine at it with the same read-only credentials. Secrets stay in <code>.env</code>.</p>
+      <div class="tabs" role="tablist" id="tabs"></div><div id="tabbody"></div></div>`;
+  renderTabs(r);
+}
+
+function table(rows, wide = [], health) {
+  if (!rows || !rows.length) return '<p class="loading" style="padding:10px 12px">No rows.</p>';
+  const cols = Object.keys(rows[0]);
+  const cls = v => v === 'broken' ? 'h-bad' : v === 'delayed' ? 'h-warn' : v === 'connected' ? 'h-ok' : '';
+  return `<table><thead><tr>${cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr>${cols.map(c =>
+    wide.includes(c) ? `<td class="json"><div>${esc(clip(row[c]))}</div></td>` : `<td class="${c === health ? cls(row[c]) : ''}">${esc(fmt(row[c]))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+}
+const clip = v => { const s = String(v ?? ''); return s.length > 180 ? s.slice(0, 180) + '…' : s; };
+const fmt = v => typeof v === 'string' && /^\d{4}-\d\d-\d\dT/.test(v) ? v.replace('T', ' ').slice(0, 19) : v;
+
+let tab = 'DuckDB';
+function renderTabs(r) {
+  const t = `${r.final_schema}.fivetran_platform__connection_status`, ep = ENV.POLARIS_ENDPOINT, cat = ENV.LC_CATALOG;
+  const ENG = {
+    DuckDB: { note: 'Already set up: run <code>./bin/lake</code> in this folder.', code: `./bin/lake\n\nselect connection_name, connection_health\nfrom lake.${t};` },
+    Python: { note: 'PyIceberg into pandas, ready for a notebook or an AI agent.', code:
+`# pip install "pyiceberg[pyarrow,pandas]"
+import os
+from pyiceberg.catalog import load_catalog
+
+lake = load_catalog("lake", type="rest",
+    uri="${ep}", warehouse="${cat}",
+    credential=f"{os.environ['POLARIS_CLIENT_ID']}:{os.environ['POLARIS_CLIENT_SECRET']}",
+    scope="PRINCIPAL_ROLE:ALL")
+df = lake.load_table("${t}").scan().to_pandas()` },
+    'Spark · Trino': { note: 'Anything that speaks the Iceberg REST catalog works, with the same endpoint and read-only credentials.', code:
+`# Spark
+spark.sql.catalog.lake = org.apache.iceberg.spark.SparkCatalog
+spark.sql.catalog.lake.type = rest
+spark.sql.catalog.lake.uri = ${ep}
+spark.sql.catalog.lake.warehouse = ${cat}
+
+# Trino (catalog properties)
+connector.name=iceberg
+iceberg.catalog.type=rest
+iceberg.rest-catalog.uri=${ep}
+iceberg.rest-catalog.warehouse=${cat}` },
+  };
+  document.getElementById('tabs').innerHTML = Object.keys(ENG).map(k => `<button type="button" role="tab" class="tab" aria-selected="${k === tab}" data-k="${k}">${k}</button>`).join('');
+  document.querySelectorAll('#tabs .tab').forEach(b => b.onclick = () => { tab = b.dataset.k; renderTabs(r); });
+  document.getElementById('tabbody').innerHTML = `<p class="tabnote">${ENG[tab].note}</p><pre class="cmd" style="margin-top:10px"><button type="button" class="copy">Copy</button>${esc(ENG[tab].code)}</pre>`;
+  const pre = document.querySelector('#tabbody pre');
+  pre.querySelector('.copy').onclick = e => copyText(pre.innerText.replace(/^Copy\s*/, ''), e.target);
+}
+
+loadEnv().then(() => runFrom(0));
+</script>
+</body>
+</html>

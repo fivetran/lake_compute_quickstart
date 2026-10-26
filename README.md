@@ -17,6 +17,19 @@ dashboard or an AI assistant. Then you'll query the results with DuckDB, straigh
 - A Fivetran API key and secret (*Fivetran dashboard → your user menu → API key*)
 - macOS or Linux with Python 3.9 or later
 
+## Follow along in your browser
+```sh
+python3 scripts/lc.py dashboard
+```
+opens a progress page on your machine. It shows every step below as a checklist, green when it's
+done and red with what to do when it isn't. It runs the same checks as the commands in this README,
+and it has buttons for the parts it can do for you: install dbt Fusion or DuckDB, sync the connector,
+and run the build. When the build is done, it shows what changed, what it cost, and how to read the
+results from other tools. Leave it running in its own terminal. Press Ctrl+C to stop it.
+
+The page only listens on your own machine (`127.0.0.1`) and opens with a one-time link. It never shows
+the secrets in `.env`.
+
 ## With an AI assistant
 Open this folder in your AI coding assistant (Claude Code, Cursor, Codex, GitHub Copilot or similar)
 and ask it to **run the Lake Compute quickstart**. It follows [`AGENTS.md`](AGENTS.md), runs the checks,
