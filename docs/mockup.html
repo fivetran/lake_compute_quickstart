@@ -331,7 +331,7 @@ const STEPS = [
   { key: 'build', title: 'Build on Lake Compute', who: 'You or your AI assistant', state: 'wait', tool: true, action: 'Run build',
     lead: 'Runs the Fivetran Platform dbt package. dbt Fusion compiles each model on your laptop, and Lake Compute runs the SQL next to your lake and writes the results back as Iceberg tables.',
     code: '<span class="c"># installs the package, checks the project, matches it to your tables, then builds</span>\n./quickstart build',
-    note: 'The first build runs one model at a time so the new schemas are created cleanly. That takes about 5 minutes. Later builds take about 3.',
+    note: 'The build takes about 3 minutes. Most of that is one large model that reads every log event.',
     cmd: 'build',
     checks: [['pe','Package installed',''],['pe','Project parses',''],['pe','Models built','']],
     after: [['ok','Package installed','fivetran/fivetran_log'],['ok','Project parses',''],['ok','19 models and 8 tests passed','2m 51s on Lake Compute']] },

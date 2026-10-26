@@ -73,9 +73,8 @@ real data without touching business data.
    debug` never creates schemas, and the build does. "Connection test passed" is what counts.
 4. `python3 scripts/lc.py preflight` matches the package to the tables this account's connector really
    has. Show the user what it set and why.
-5. `./bin/dbtw build --selector fivetran_log --threads 1` is the first build, about 5 minutes. One
-   thread avoids a race when several models create the same new schema (`409 AlreadyExists`). If that
-   happens anyway, rerun. Later builds can drop `--threads 1` (about 3 minutes).
+5. `./bin/dbtw build --selector fivetran_log` builds the package, about 3 minutes, using the profile's 8
+   threads. If a model fails with `409 AlreadyExists` on a new schema, rerun once.
    Expect 19 models and 8 tests, in schemas `quickstart_stg_fivetran_platform` and `quickstart_fivetran_platform`.
 6. `python3 scripts/lc.py cost` shows Lake Compute's own record of the build: queries, data scanned,
    and estimated cost, next to a rough estimate for the same build on a typical cloud data warehouse.
