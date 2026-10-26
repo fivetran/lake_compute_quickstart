@@ -14,7 +14,8 @@ the two in step.
   secret. If any output shows something matching `dct_[A-Za-z0-9_-]+`, redact it before repeating it.
 - **Don't change the user's machine outside this folder** without asking. Don't edit
   `~/.dbt/profiles.yml` or shell rc files, and don't uninstall or replace an existing dbt.
-- **Steps that need the Fivetran dashboard are the user's.** Tell them exactly where to click, wait
+- **Steps that need the Fivetran dashboard are the user's** (Lake Compute toggle, token, connector,
+  read-only catalog secret). Tell them exactly where to click, wait
   until they say it's done, then run the step's check.
 - **Each step ends with a check.** Don't move on until it passes. When a check fails, its message says
   what to fix. Pass that on in plain words.
@@ -84,9 +85,10 @@ DuckDB reads the results straight from the lake, with no Fivetran or dbt in betw
 results are open Iceberg tables the user owns.
 1. If `duckdb --version` shows 1.4 or later, it can be used as is. Otherwise
    `python3 scripts/lc.py install-duckdb` installs it into `./bin` only.
-2. If `duckdb-check` says the catalog credentials are missing or rejected, ask the user to fill in
-   `POLARIS_CLIENT_ID` and `POLARIS_CLIENT_SECRET` in `.env`, as a pair, with their destination's catalog
-   client ID and secret.
+2. **Dashboard step.** Ask the user to open their destination's page in the Fivetran dashboard, copy the
+   **read-only** catalog client secret, paste it into `POLARIS_CLIENT_SECRET` in `.env` and save. Reading
+   is all this needs, and any user can see the read-only pair (only destination admins see the
+   read/write one). The catalog address and client ID were saved in step 0.
 3. `python3 scripts/lc.py duckdb-check` connects and lists the quickstart schemas.
 4. `./bin/lake` opens a SQL prompt with the lake attached as `lake`.
 
@@ -119,4 +121,5 @@ one, so the log connector's own latest sync shows up next time. The build isn't 
 - **`Catalog Error: Table with name … does not exist`** in a `stg_fivetran_platform__*` model: an optional
   source table is missing. Rerun `python3 scripts/lc.py preflight`, then build again.
 - **Token check names another destination:** the token came from a different destination's page.
-- **DuckDB `401` or `403`:** the catalog client ID or secret in `.env` doesn't match the destination.
+- **DuckDB `401` or `403`:** `POLARIS_CLIENT_SECRET` isn't this destination's read-only secret (for example,
+  it's the read/write one, or from another destination).

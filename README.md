@@ -94,13 +94,14 @@ Lake Compute estimates cost at **$3 per TB scanned**. `lc.py cost` reads its own
 in the build.
 
 ### 6. Query it yourself with DuckDB
+DuckDB needs read access to your catalog. In the Fivetran dashboard, open your destination's page,
+copy the **read-only** client secret, and paste it into `POLARIS_CLIENT_SECRET` in `.env`. The catalog
+address and client ID are already there from step 0. Then:
 ```sh
 python3 scripts/lc.py install-duckdb   # into ./bin only; skip if you have DuckDB 1.4 or later
 python3 scripts/lc.py duckdb-check
 ./bin/lake                             # SQL prompt, with your lake attached as `lake`
 ```
-If `duckdb-check` asks for them, fill in `POLARIS_CLIENT_ID` and `POLARIS_CLIENT_SECRET` in `.env`
-with your destination's catalog client ID and secret. They only work as a pair.
 
 ### 7. See what changed
 Before: raw sync events, with the details packed into JSON.
@@ -122,7 +123,8 @@ up next time.
 
 ## Read it from anywhere
 The results are Iceberg tables in your destination's catalog. Any engine that speaks the Iceberg REST
-catalog can read them. Your catalog endpoint, name and client ID are in `.env`.
+catalog can read them, using the same read-only credentials. Your catalog endpoint, name and client ID
+are in `.env`.
 
 **DuckDB:** `./bin/lake` does this for you. The setup it runs is in [`scripts/lake.sql`](scripts/lake.sql).
 

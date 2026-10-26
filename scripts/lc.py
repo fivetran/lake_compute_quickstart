@@ -165,15 +165,11 @@ def use_destination(group_id):
     pc = c.get("polaris_catalog_configuration", {})
     updates = {"FIVETRAN_GROUP_ID": group_id, "LC_CATALOG": pc.get("polaris_catalog", ""),
                "POLARIS_ENDPOINT": (pc.get("polaris_server_endpoint") or "").rstrip("/"),
+               # The catalog's read-only client ID. Its secret is masked in the API; the user copies it from
+               # the destination page into POLARIS_CLIENT_SECRET (step 6).
+               "POLARIS_CLIENT_ID": pc.get("client_id", ""),
                "MDLS_BUCKET": c.get("bucket", ""), "MDLS_PREFIX": c.get("prefix_path", ""),
                "MDLS_REGION": c.get("region", "")}
-    # The catalog client ID and secret only work as a pair. The API masks the secret, so fill in the ID only
-    # when the user hasn't entered a pair of their own, and save the secret only if the API returns it.
-    secret = pc.get("client_secret") or ""
-    if not env.get("POLARIS_CLIENT_SECRET"):
-        updates["POLARIS_CLIENT_ID"] = pc.get("client_id", "")
-        if secret and set(secret) != {"*"}:
-            updates["POLARIS_CLIENT_SECRET"] = secret  # written to .env only, never printed
     save_env(updates)
     print(f"saved destination {group_id} (catalog {pc.get('polaris_catalog')}) to .env")
     print(f"Lake Compute: {'ON' if c.get('is_dbt_compute_enabled') else 'off (step 2 switches it on)'}")
@@ -417,10 +413,10 @@ def install_duckdb():
 
 def duckdb_check():
     env = load_env()
-    need(env, "LC_CATALOG", "POLARIS_ENDPOINT")
-    if not env.get("POLARIS_CLIENT_ID") or not env.get("POLARIS_CLIENT_SECRET"):
-        die("fill in POLARIS_CLIENT_ID and POLARIS_CLIENT_SECRET in .env, as a pair, with your destination's "
-            "catalog client ID and secret.")
+    need(env, "LC_CATALOG", "POLARIS_ENDPOINT", "POLARIS_CLIENT_ID")
+    if not env.get("POLARIS_CLIENT_SECRET"):
+        die("POLARIS_CLIENT_SECRET is empty in .env. Copy the read-only client secret from your destination's "
+            "page in the Fivetran dashboard into .env, then rerun.")
     sql = ("select table_schema, count(*) as tables from information_schema.tables "
            "where table_catalog = 'lake' and table_schema like 'quickstart%' group by 1 order by 1")
     out = subprocess.run([str(ROOT / "bin" / "lake"), "-c", sql], cwd=ROOT, capture_output=True, text=True,
@@ -428,8 +424,8 @@ def duckdb_check():
     text = redact(out.stdout + out.stderr)
     if out.returncode != 0:
         if "401" in text or "unauthorized" in text.lower():
-            die("the catalog rejected POLARIS_CLIENT_ID and POLARIS_CLIENT_SECRET. They must be a matching pair "
-                "for this destination's catalog.")
+            die("the catalog rejected the credentials. Check that POLARIS_CLIENT_SECRET is the read-only client "
+                "secret from this destination's page (not the read/write one), then rerun.")
         die(f"DuckDB couldn't read the catalog:\n{text.strip()}")
     print(text.strip())
     if "quickstart" not in text:

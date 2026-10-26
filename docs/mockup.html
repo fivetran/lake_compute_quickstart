@@ -334,13 +334,15 @@ const STEPS = [
     cmd: 'build',
     checks: [['pe','Package installed',''],['pe','Project parses',''],['pe','Models built','']],
     after: [['ok','Package installed','fivetran/fivetran_log'],['ok','Project parses',''],['ok','19 models and 8 tests passed','2m 51s on Lake Compute']] },
-  { key: 'duckdb', title: 'Query it yourself with DuckDB', who: 'You or your AI assistant', state: 'wait', tool: true, action: 'Install DuckDB',
+  { key: 'duckdb', title: 'Query it yourself with DuckDB', who: 'You, then your AI assistant', state: 'wait', tool: true, action: 'Install DuckDB',
     lead: 'DuckDB is a free, open source SQL engine that runs on your laptop. It reads the tables straight from your lake, with no Fivetran or dbt in between. That shows the results are open Iceberg tables you own.',
-    todo: ['Click <b>Install DuckDB</b>. It goes into this project folder only, the same way as dbt Fusion.',
-           'Your catalog\'s address, warehouse, client ID and secret come from the Fivetran API and go straight into <code>.env</code>. You don\'t copy anything by hand.'],
+    todo: ['Open <span class="path">Destinations<span>›</span>acme_lake</span> in the Fivetran dashboard and copy the <b>read-only</b> catalog client secret.',
+           'Paste it into <code>POLARIS_CLIENT_SECRET</code> in <code>.env</code> and save. The catalog address and client ID are already there.',
+           'Click <b>Install DuckDB</b>. It goes into this project folder only, the same way as dbt Fusion.'],
+    note: 'Read-only is all this needs, and you don\'t have to be a destination admin to see it.',
     code: '<span class="c"># afterwards, open a SQL prompt already connected to your lake</span>\n./bin/lake\n\nselect connection_name, connection_health\nfrom lake.quickstart_fivetran_platform.fivetran_platform__connection_status;',
-    checks: [['pe','DuckDB installed',''],['pe','Catalog details saved to .env',''],['pe','Connected to your catalog','']],
-    after: [['ok','DuckDB installed','1.4.1, in ./bin'],['ok','Catalog details saved to .env','address, warehouse acme_lake, client ID, secret'],['ok','Connected to your catalog','2 new schemas, 19 tables']] },
+    checks: [['pe','Read-only secret in .env',''],['pe','DuckDB installed',''],['pe','Connected to your catalog','']],
+    after: [['ok','Read-only secret in .env','client ID and address filled in from the Fivetran API'],['ok','DuckDB installed','1.5.0, in ./bin'],['ok','Connected to your catalog','2 new schemas, 19 tables']] },
 ];
 const ICONS = { done: '✓', need: '!', ready: '▶', wait: '·' };
 const PILLS = { done: 'Done', need: 'Need to do', ready: 'Ready', wait: 'Waiting' };
@@ -434,7 +436,7 @@ document.getElementById('btn-reset').onclick = () => { STEPS.forEach((s, i) => s
 
 const ENG = {
   DuckDB: { note: 'Already set up in step 6: run <code>./bin/lake</code>. Below is what it runs, if you want to connect from your own DuckDB.', code:
-`<span class="c">-- values come from .env (filled in from the Fivetran API in step 6)</span>
+`<span class="c">-- values come from .env: read-only client ID and secret</span>
 INSTALL iceberg; LOAD iceberg;
 CREATE SECRET polaris (
   TYPE iceberg,
