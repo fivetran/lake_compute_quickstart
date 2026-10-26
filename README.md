@@ -83,12 +83,12 @@ python3 scripts/lc.py log-connector --sync   # only if it has never finished a s
 ./bin/dbtw parse
 ./bin/dbtw debug                     # on a new lake, the write test fails; "connection test passed" is what counts
 python3 scripts/lc.py preflight      # matches the package to the tables your connector has
-./bin/dbtw build --selector fivetran_log --threads 1
+./bin/dbtw build --selector fivetran_log
 python3 scripts/lc.py cost           # queries, data scanned, estimated cost
 ```
-The first build takes about 5 minutes and creates 19 models in two new schemas,
-`quickstart_stg_fivetran_platform` and `quickstart_fivetran_platform`. Later builds can drop
-`--threads 1` and take about 3 minutes.
+The build takes about 3 minutes and creates 19 models in two new schemas,
+`quickstart_stg_fivetran_platform` and `quickstart_fivetran_platform`. If a model fails with
+`409 AlreadyExists` on the first build, rerun it once.
 
 `lc.py cost` shows Lake Compute's estimated cost for the build, from its own record of every query, next
 to a rough estimate for running the same build on a typical cloud data warehouse.

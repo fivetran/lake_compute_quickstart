@@ -12,4 +12,5 @@ lake_compute_quickstart:
       base_url: "https://api.lake-compute.fivetran.com/"
       database: "{{ env_var('LC_CATALOG') }}"
       schema: quickstart
-      threads: 4
+      # Lake Compute runs up to 15 queries at once per token. 8 leaves headroom when you add more packages.
+      threads: 8
