@@ -90,7 +90,7 @@ pre.log { max-height: 340px; overflow: auto; font-size: 0.76rem; white-space: pr
 .check ul { list-style: none; margin: 0; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 0.88rem; }
 .check li { display: grid; grid-template-columns: 18px minmax(0,1fr); gap: 8px; overflow-wrap: anywhere; }
 .check li .m { font-weight: 700; }
-.check li.ok .m { color: var(--ok); } .check li.no .m { color: var(--need); } .check li.info .m { color: var(--wait); }
+.check li.ok .m { color: var(--ok); } .check li.no .m { color: var(--need); } .check li.info .m { color: var(--wait); } .check li.warn .m { color: var(--warn); }
 .check li .d { color: var(--muted); }
 
 .choices { display: flex; flex-direction: column; gap: 8px; }
@@ -190,7 +190,9 @@ const STEPS = [
     note: 'Type secrets into <code>.env</code> in your editor. Never paste them into a chat or a terminal.' },
   { key: 'fusion', title: 'Install dbt Fusion', who: 'You or your AI assistant',
     lead: () => `dbt Fusion is the dbt engine that can send models to Lake Compute. Install it the way the <a href="${DOCS}" target="_blank" rel="noopener">dbt docs</a> describe. You don't need <code>dbt login</code>: this quickstart doesn't use the dbt platform.`,
-    code: '<span class="c"># macOS and Linux, in a terminal</span>\ncurl -fsSL https://public.cdn.getdbt.com/fs/install/install.sh | sh -s -- --update\nexec $SHELL',
+    code: () => ENV.windows
+      ? '<span class="c"># Windows, in PowerShell</span>\nirm https://public.cdn.getdbt.com/fs/install/install.ps1 | iex\n<span class="c"># then open a new PowerShell window</span>'
+      : '<span class="c"># macOS and Linux, in a terminal</span>\ncurl -fsSL https://public.cdn.getdbt.com/fs/install/install.sh | sh -s -- --update\nexec $SHELL',
     note: 'Already have a <code>dbt</code> you\'d rather not replace? <b>Install into this folder</b> puts Fusion in <code>./bin</code> instead.',
     extra: [{ action: 'install-fusion', label: 'Install into this folder' }] },
   { key: 'lake_compute', title: 'Turn on Lake Compute', who: 'You, in the Fivetran dashboard',
@@ -212,7 +214,9 @@ const STEPS = [
     extra: [{ action: 'sync-log', label: 'Sync now' }] },
   { key: 'build', title: 'Build on Lake Compute', who: 'You or your AI assistant', tool: true,
     lead: () => 'Runs the Fivetran Platform dbt package. dbt Fusion compiles each model on your laptop, and Lake Compute runs the SQL next to your lake and writes the results back as Iceberg tables.',
-    code: '<span class="c"># what Run build does</span>\n./bin/dbtw deps\n./bin/dbtw parse\npython3 scripts/lc.py preflight\n./bin/dbtw build --selector fivetran_log\npython3 scripts/lc.py cost',
+    code: () => ENV.windows
+      ? '<span class="c"># what Run build does</span>\n.\\bin\\dbtw deps\n.\\bin\\dbtw parse\npython scripts\\lc.py preflight\n.\\bin\\dbtw build --selector fivetran_log\npython scripts\\lc.py cost'
+      : '<span class="c"># what Run build does</span>\n./bin/dbtw deps\n./bin/dbtw parse\npython3 scripts/lc.py preflight\n./bin/dbtw build --selector fivetran_log\npython3 scripts/lc.py cost',
     note: 'Takes about 3 minutes. Most of that is one large model that reads every log event.',
     primary: { action: 'build', label: 'Run build' } },
   { key: 'duckdb', title: 'Query it yourself with DuckDB', who: 'You, then your AI assistant',
@@ -220,7 +224,7 @@ const STEPS = [
     todo: () => [`Open <span class="path">Destinations<span>›</span>${dest()}</span> in the Fivetran dashboard and copy the <b>read-only</b> catalog client secret.`,
                  'Paste it into <code>POLARIS_CLIENT_SECRET</code> in <code>.env</code> and save. The catalog address and client ID are already there.',
                  'Click <b>Install DuckDB</b> if you don\'t have it, then <b>Re-check</b>.'],
-    code: '<span class="c"># afterwards, a SQL prompt connected to your lake</span>\n./bin/lake',
+    code: () => '<span class="c"># afterwards, a SQL prompt connected to your lake</span>\n' + (ENV.windows ? '.\\bin\\lake' : './bin/lake'),
     note: 'Read-only is all this needs, and you don\'t have to be a destination admin to see it.',
     extra: [{ action: 'install-duckdb', label: 'Install DuckDB' }] },
 ];
@@ -314,7 +318,7 @@ function renderPanel() {
   const s = STEPS[current], st = S[current];
   const busy = st.state === 'checking' || st.state === 'running' || Object.values(JOBS).some(j => !j.done);
   const prev = S.slice(0, current).findIndex(x => x.state !== 'done');
-  const marks = { ok: '✓', no: '✕', info: '·' };
+  const marks = { ok: '✓', no: '✕', info: '·', warn: '!' };
   const rows = st.rows.length ? st.rows : [{ kind: 'info', text: st.state === 'wait' ? 'Not checked yet.' : 'Checking…' }];
   const extras = (s.extra || []).map(x => `<button type="button" class="btn ${st.offer === x.action ? '' : 'ghost'}" data-action="${x.action}" ${busy ? 'disabled' : ''}>${x.label}</button>`).join('');
   const primary = s.primary
@@ -328,11 +332,11 @@ function renderPanel() {
     ${prev !== -1 && st.state === 'wait' ? `<div class="note warn">Finish <b>${STEPS[prev].title}</b> first.</div>` : ''}
     <p class="lead">${s.lead()}</p>
     ${s.todo ? `<ol class="do">${s.todo().map(t => `<li>${t}</li>`).join('')}</ol>` : ''}
-    ${s.code ? `<pre class="cmd"><button type="button" class="copy">Copy</button>${s.code}</pre>` : ''}
+    ${s.code ? `<pre class="cmd"><button type="button" class="copy">Copy</button>${s.code()}</pre>` : ''}
     ${s.note ? `<div class="note">${s.note}</div>` : ''}
     ${st.missing_env ? `<div class="actions"><button type="button" class="btn" id="create-env">Create .env</button></div>` : ''}
     ${st.choices ? `<div class="choices">${st.choices.length ? st.choices.map(c => `
-      <div class="choice"><div><b>${esc(c.name || c.id)}</b><div class="mono">${esc(c.id)} · catalog ${esc(c.catalog)} · ${esc(c.region)} · Lake Compute ${esc(c.lake_compute)}</div></div>
+      <div class="choice"><div><b>${esc(c.name || c.id)}</b><div class="mono">${esc(c.id)} · catalog ${esc(c.catalog)} · ${esc(c.region)} · Lake Compute ${esc(c.lake_compute)}</div>${c.warning ? `<div class="mono" style="color:var(--warn)">${esc(c.warning)}</div>` : ''}</div>
       <button type="button" class="btn small" data-dest="${esc(c.id)}">Use this</button></div>`).join('')
       : '<div class="note warn">No Managed Data Lake destinations in this account. Create one in the Fivetran dashboard, then Re-check.</div>'}</div>` : ''}
     <div class="check">
@@ -431,7 +435,7 @@ let tab = 'DuckDB';
 function renderTabs(r) {
   const t = `${r.final_schema}.fivetran_platform__connection_status`, ep = ENV.POLARIS_ENDPOINT, cat = ENV.LC_CATALOG;
   const ENG = {
-    DuckDB: { note: 'Already set up: run <code>./bin/lake</code> in this folder.', code: `./bin/lake\n\nselect connection_name, connection_health\nfrom lake.${t};` },
+    DuckDB: { note: `Already set up: run <code>${ENV.windows ? '.\\bin\\lake' : './bin/lake'}</code> in this folder.`, code: `${ENV.windows ? '.\\bin\\lake' : './bin/lake'}\n\nselect connection_name, connection_health\nfrom lake.${t};` },
     Python: { note: 'PyIceberg into pandas, ready for a notebook or an AI agent.', code:
 `# pip install "pyiceberg[pyarrow,pandas]"
 import os

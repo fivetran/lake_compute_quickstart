@@ -6,7 +6,7 @@ description: >
   Iceberg tables, then queried with DuckDB. No warehouse or dbt platform.
   Trigger on: "lake compute quickstart", "set up lake compute", "try lake compute",
   "run dbt on my data lake", "transform my MDLS data".
-allowed-tools: Bash(python3 scripts/lc.py:*) Bash(./bin/dbtw:*) Bash(./bin/lake:*) Bash(cp .env.example .env:*) Bash(chmod 600 .env:*)
+allowed-tools: Bash(python3 scripts/lc.py:*) Bash(python scripts/lc.py:*) Bash(./bin/dbtw:*) Bash(./bin/lake:*)
 ---
 
 # Lake Compute quickstart

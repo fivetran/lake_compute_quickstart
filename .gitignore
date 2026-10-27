@@ -10,6 +10,8 @@ package-lock.yml
 # Binaries the quickstart downloads into this folder
 bin/dbt
 bin/duckdb
+bin/dbt.exe
+bin/duckdb.exe
 
 .venv/
 .DS_Store
