@@ -23,7 +23,7 @@ import lc  # noqa: E402
 
 ROOT = lc.ROOT
 LC = [sys.executable, str(ROOT / "scripts" / "lc.py")]
-DBTW = str(ROOT / "bin" / "dbtw")
+DBTW = LC + ["dbt"]
 PAGE = ROOT / "scripts" / "dashboard.html"
 BUILD = ROOT / "target" / "quickstart_build.json"
 RESULTS = ROOT / "target" / "quickstart_results.json"
@@ -42,8 +42,8 @@ CHECKS = {
 ACTIONS = {
     "install-fusion": [LC + ["install-fusion"]],
     "sync-log": [LC + ["log-connector", "--sync"]],
-    "build": [[DBTW, "deps"], [DBTW, "parse"], LC + ["preflight"],
-              [DBTW, "build", "--selector", "fivetran_log"], LC + ["cost"]],
+    "build": [DBTW + ["deps"], DBTW + ["parse"], LC + ["preflight"],
+              DBTW + ["build", "--selector", "fivetran_log"], LC + ["cost"]],
     "install-duckdb": [LC + ["install-duckdb"]],
 }
 # Settings the page may show. Everything else in .env stays on this machine.
@@ -62,7 +62,7 @@ def clean(text):
 
 
 def run(cmd, timeout=600):
-    out = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, timeout=timeout)
+    out = subprocess.run(cmd, cwd=ROOT, env=dict(os.environ, PYTHONIOENCODING="utf-8"), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
     return out.returncode, clean(out.stdout + out.stderr)
 
 
@@ -75,6 +75,8 @@ def lines_of(text):
             continue
         if line.startswith("ERROR:"):
             rows.append({"kind": "no", "text": line[6:].strip()})
+        elif line.startswith("WARNING:"):
+            rows.append({"kind": "warn", "text": line[8:].strip()})
         elif "✓" in line:
             rows.append({"kind": "ok", "text": line.replace("✓", "").strip()})
         else:
@@ -115,14 +117,16 @@ def parse_destinations(text):
     for line in text.splitlines():
         m = re.match(r"^(\S+)\s+name='?(.*?)'?\s+region=(\S*)\s+lake_compute=(\S+)\s+catalog=(\S*)", line)
         if m:
-            out.append(dict(zip(["id", "name", "region", "lake_compute", "catalog"], m.groups())))
+            warning = re.search(r"WARNING: (.*)$", line)
+            out.append(dict(zip(["id", "name", "region", "lake_compute", "catalog"], m.groups()),
+                            warning=warning.group(1) if warning else ""))
     return out
 
 
 def check_build():
     if not BUILD.exists():
         return {"state": "ready", "rows": [{"kind": "info", "text": "Not built yet."}]}
-    b = json.loads(BUILD.read_text())
+    b = json.loads(BUILD.read_text(encoding="utf-8"))
     ok = b["models_failed"] == 0 and b["tests_failed"] == 0
     rows = [{"kind": "ok" if ok else "no",
              "text": f"{b['models_ok']} models and {b['tests_passed']} tests passed"
@@ -155,7 +159,8 @@ def run_job(job_id, cmds):
         shown = " ".join(os.path.relpath(c, ROOT) if c.startswith(str(ROOT)) else os.path.basename(c)
                          if c == sys.executable else c for c in cmd)
         job["lines"].append(f"$ {shown}")
-        p = subprocess.Popen(cmd, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+        p = subprocess.Popen(cmd, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+                             errors="replace", bufsize=1, env=dict(os.environ, PYTHONIOENCODING="utf-8"))
         for line in p.stdout:
             job["lines"].append(clean(line.rstrip("\n")))
         rc = p.wait()
@@ -172,12 +177,12 @@ def run_job(job_id, cmds):
 def query(sql, limit=10):
     """Rows for one SELECT: straight from the lake with DuckDB if it's set up, otherwise through Lake Compute."""
     e = env()
-    if e.get("POLARIS_CLIENT_SECRET") and (shutil.which("duckdb") or (ROOT / "bin" / "duckdb").exists()):
-        rc, text = run([str(ROOT / "bin" / "lake"), "-json", "-c", sql.format(db="lake")], timeout=300)
+    if e.get("POLARIS_CLIENT_SECRET") and lc.find_duckdb():
+        rc, text = run(LC + ["lake", "-json", "-c", sql.format(db="lake")], timeout=300)
         if rc == 0:
             return parse_json_rows(text), "DuckDB, straight from your lake"
-    rc, text = run([DBTW, "show", "--inline", sql.format(db=e.get("LC_CATALOG", "")), "--output", "json",
-                    "--limit", str(limit)], timeout=300)
+    rc, text = run(DBTW + ["show", "--inline", sql.format(db=e.get("LC_CATALOG", "")), "--output", "json",
+                           "--limit", str(limit)], timeout=300)
     return parse_json_rows(text), "Lake Compute"
 
 
@@ -201,12 +206,12 @@ def parse_json_rows(text):
 def results():
     if not BUILD.exists():
         return {"ready": False}
-    build = json.loads(BUILD.read_text())
+    build = json.loads(BUILD.read_text(encoding="utf-8"))
     if RESULTS.exists():
-        cached = json.loads(RESULTS.read_text())
+        cached = json.loads(RESULTS.read_text(encoding="utf-8"))
         if cached.get("run_id") == build["run_id"]:
             return cached
-    manifest = json.loads((ROOT / "target" / "manifest.json").read_text())
+    manifest = json.loads((ROOT / "target" / "manifest.json").read_text(encoding="utf-8"))
     models = [n for n in manifest["nodes"].values()
               if n.get("package_name") == "fivetran_log" and n["resource_type"] == "model"]
     sources = sorted(s["identifier"] for s in manifest["sources"].values() if s.get("package_name") == "fivetran_log")
@@ -233,7 +238,7 @@ def results():
             "sources": sources, "staging": staging, "final": final,
             "staging_schema": next((n["schema"] for n in models if n["name"].startswith("stg_")), ""),
             "final_schema": status["schema"]}
-    RESULTS.write_text(json.dumps(data, default=str))
+    RESULTS.write_text(json.dumps(data, default=str), encoding="utf-8")
     return data
 
 
@@ -271,13 +276,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             q = urllib.parse.parse_qs(url.query)
             if not secrets.compare_digest(q.get("t", [""])[0], self.token):
                 return self.send(403, b"Open the link printed by `python3 scripts/lc.py dashboard`.", "text/plain")
-            html = PAGE.read_text().replace("__QUICKSTART_TOKEN__", self.token)
+            html = PAGE.read_text(encoding="utf-8").replace("__QUICKSTART_TOKEN__", self.token)
             return self.send(200, html.encode(), "text/html; charset=utf-8")
         if not self.allowed():
             return self.send(403, {"error": "forbidden"})
         if url.path == "/api/env":
             e = env()
-            return self.send(200, {"has_env": lc.ENV.exists(), **{k: e.get(k, "") for k in SHOWN}})
+            return self.send(200, {"has_env": lc.ENV.exists(), "windows": lc.WINDOWS,
+                                   **{k: e.get(k, "") for k in SHOWN}})
         if url.path.startswith("/api/job/"):
             job = JOBS.get(url.path.rsplit("/", 1)[1])
             if not job:

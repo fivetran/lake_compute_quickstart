@@ -2,10 +2,12 @@
 """Lake Compute quickstart helper. Standard library only. Never prints secrets.
 
 Every command works from any folder: it changes to the quickstart folder (the one holding .env) first.
+On Windows, use `python` (or `py`) instead of `python3`.
 
           python3 scripts/lc.py dashboard                progress page in your browser: every check below, live
 
-  Step 0  python3 scripts/lc.py verify-key               who owns the Fivetran key, which account
+  Step 0  python3 scripts/lc.py init-env                 create .env from .env.example
+          python3 scripts/lc.py verify-key               who owns the Fivetran key, which account
           python3 scripts/lc.py destinations             Managed Data Lake destinations, Lake Compute on/off
           python3 scripts/lc.py use-destination <id>     saves the destination's details to .env
   Step 1  python3 scripts/lc.py fusion-check             is dbt Fusion installed (and not dbt Core)?
@@ -17,6 +19,9 @@ Every command works from any folder: it changes to the quickstart folder (the on
           python3 scripts/lc.py cost                     what the last build cost on Lake Compute
   Step 6  python3 scripts/lc.py install-duckdb           latest DuckDB into ./bin only
           python3 scripts/lc.py duckdb-check             can DuckDB read your catalog directly?
+
+  Any     python3 scripts/lc.py dbt <args>               dbt Fusion with .env loaded (bin/dbtw runs this)
+          python3 scripts/lc.py lake [duckdb args]       DuckDB attached to your lake (bin/lake runs this)
 
 Secrets (FIVETRAN_API_SECRET, LAKE_COMPUTE_TOKEN, POLARIS_CLIENT_SECRET) are read from .env only and are
 never printed. Only non-secret fields are shown.
@@ -32,7 +37,6 @@ import shutil
 import subprocess
 import sys
 import tarfile
-import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -40,13 +44,23 @@ import zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 ENV = ROOT / ".env"
+WINDOWS = platform.system() == "Windows"
+EXE = ".exe" if WINDOWS else ""
+# Lake Compute's AWS regions (https://docs.getdbt.com/docs/lake-compute). The bucket must be in one of them.
+LAKE_COMPUTE_REGIONS = {"us-east-1", "us-west-2"}
 API = "https://api.fivetran.com/v1"
 TOKEN_EXCHANGE = "https://api.fivetran.com/partner/v1/dbt-compute/token-exchange"
 FUSION_CDN = "https://public.cdn.getdbt.com/fs"
+FUSION_DOCS = "https://docs.getdbt.com/docs/local/install-dbt?version=2"
 # Pinned to the version tested against Polaris with ./bin/lake. Bump after retesting step 6.
 DUCKDB_VERSION = "v1.5.0"
 PROJECT = "lake_compute_quickstart"  # dbt_project.yml name; Lake Compute records it on every query
 SECRET_RE = re.compile(r"dct_[A-Za-z0-9_-]+")
+
+# Windows consoles and pipes may default to a legacy encoding that can't print ✓ or dbt's table borders.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
 
 
 def die(msg):
@@ -72,11 +86,28 @@ def load_env():
     if git_tracks(".env"):
         die(".env is tracked by git. Run `git rm --cached .env` so your secrets aren't committed.")
     env = {}
-    for line in ENV.read_text().splitlines():
+    for line in ENV.read_text(encoding="utf-8").splitlines():
         if "=" in line and not line.lstrip().startswith("#"):
             k, v = line.split("=", 1)
             env[k.strip()] = v.strip().strip('"').strip("'")
     _ENV_CACHE.update(env)
+    return env
+
+
+def init_env():
+    """Create .env from .env.example, readable only by you. Leaves an existing .env alone."""
+    if ENV.exists():
+        print(".env already exists. Open it in your editor to fill it in.")
+        return
+    shutil.copy(ROOT / ".env.example", ENV)
+    os.chmod(ENV, 0o600)  # no effect on Windows, where your user folder is already private
+    print(f"created {ENV}. Open it in your editor and fill in FIVETRAN_API_KEY and FIVETRAN_API_SECRET.")
+
+
+def child_env():
+    """This process's environment plus every setting in .env, for dbt and DuckDB."""
+    env = dict(os.environ)
+    env.update({k: v for k, v in load_env().items() if re.match(r"^[A-Z_][A-Z0-9_]*$", k)})
     return env
 
 
@@ -90,13 +121,13 @@ def git_tracks(path):
 
 def save_env(updates):
     """Set keys in .env, keeping every other line (and the file mode) unchanged."""
-    lines, seen = ENV.read_text().splitlines(), set()
+    lines, seen = ENV.read_text(encoding="utf-8").splitlines(), set()
     for i, line in enumerate(lines):
         k = line.split("=", 1)[0].strip() if "=" in line and not line.lstrip().startswith("#") else None
         if k in updates:
             lines[i], seen = f"{k}={updates[k]}", seen | {k}
     lines += [f"{k}={v}" for k, v in updates.items() if k not in seen]
-    ENV.write_text("\n".join(lines) + "\n")
+    ENV.write_text("\n".join(lines) + "\n", encoding="utf-8")
     os.chmod(ENV, 0o600)
     _ENV_CACHE.update(updates)
 
@@ -156,7 +187,8 @@ def destinations():
         found += 1
         print(f"{g['id']}  name={g.get('name')!r}  region={d.get('region')}  "
               f"lake_compute={'ON' if c.get('is_dbt_compute_enabled') else 'off'}  "
-              f"catalog={pc.get('polaris_catalog')}  bucket={c.get('bucket')}/{c.get('prefix_path') or ''}")
+              f"catalog={pc.get('polaris_catalog')}  bucket={c.get('bucket')}/{c.get('prefix_path') or ''}"
+              + region_warning(c))
     if not found:
         print("No Managed Data Lake destinations in this account. Create one in the Fivetran dashboard first.")
 
@@ -175,20 +207,66 @@ def use_destination(group_id):
     save_env(updates)
     print(f"saved destination {group_id} (catalog {pc.get('polaris_catalog')}) to .env")
     print(f"Lake Compute: {'ON' if c.get('is_dbt_compute_enabled') else 'off (step 2 switches it on)'}")
+    if region_warning(c):
+        print(region_warning(c).strip())
+
+
+def region_warning(config):
+    """Lake Compute runs on AWS only, in LAKE_COMPUTE_REGIONS, next to the destination's bucket."""
+    regions = ", ".join(sorted(LAKE_COMPUTE_REGIONS))
+    provider, region = config.get("storage_provider"), config.get("region")
+    if provider and provider != "AWS":
+        return f"  WARNING: this lake is on {provider}. Lake Compute needs an AWS S3 lake in {regions}."
+    if region and region not in LAKE_COMPUTE_REGIONS:
+        return f"  WARNING: bucket region {region} isn't a Lake Compute region ({regions}). Pick a destination in one of those."
+    return ""
 
 
 # ---- Step 1: dbt Fusion ----------------------------------------------------------------------------
 
 def find_dbt():
-    local = ROOT / "bin" / "dbt"
+    local = ROOT / "bin" / f"dbt{EXE}"
     return str(local) if local.exists() else shutil.which("dbt")
+
+
+def find_duckdb():
+    local = ROOT / "bin" / f"duckdb{EXE}"
+    return str(local) if local.exists() else shutil.which("duckdb")
+
+
+def run_dbt(args):
+    """dbt Fusion with .env loaded and this folder's profiles.yml (what bin/dbtw runs)."""
+    dbt = find_dbt()
+    if not dbt:
+        die("dbt Fusion not found. See step 1 in README.md.")
+    sys.exit(subprocess.call([dbt, *args, "--profiles-dir", str(ROOT)], cwd=ROOT, env=child_env()))
+
+
+def run_lake(args):
+    """DuckDB attached to the destination's Iceberg catalog as `lake` (what bin/lake runs). The catalog secret
+    reaches DuckDB through the environment (getenv in scripts/lake.sql), never a command line or file."""
+    env = child_env()
+    for k in ("LC_CATALOG", "POLARIS_ENDPOINT", "POLARIS_CLIENT_ID", "POLARIS_CLIENT_SECRET"):
+        if not env.get(k):
+            die(f"{k} is empty in .env.")
+    if "'" in env["LC_CATALOG"] + env["POLARIS_ENDPOINT"]:
+        die("unexpected quote in LC_CATALOG or POLARIS_ENDPOINT")
+    duckdb = find_duckdb()
+    if not duckdb:
+        die("DuckDB not found. Run: python3 scripts/lc.py install-duckdb")
+    attach = (f"ATTACH '{env['LC_CATALOG']}' AS lake "
+              f"(TYPE iceberg, ENDPOINT '{env['POLARIS_ENDPOINT'].rstrip('/')}', SECRET polaris);")
+    # Silence the setup output, so `-json` and `-c` print only the user's query.
+    setup = ["-cmd", f".output {os.devnull}", "-cmd", f".read {ROOT / 'scripts' / 'lake.sql'}", "-cmd", ".output",
+             "-cmd", attach]
+    sys.exit(subprocess.call([duckdb, "-init", os.devnull, *setup, *args], cwd=ROOT, env=env))
 
 
 def fusion_check():
     dbt = find_dbt()
     if not dbt:
         die("dbt Fusion isn't installed. Install it (step 1), then rerun this check.")
-    out = subprocess.run([dbt, "--version"], capture_output=True, text=True, timeout=60)
+    out = subprocess.run([dbt, "--version"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
     first = (out.stdout + out.stderr).strip().splitlines()[:1]
     version = first[0] if first else ""
     if re.match(r"dbt(-fusion)? 2\.", version):
@@ -206,29 +284,31 @@ def install_fusion():
     machine, system = platform.machine().lower(), platform.system()
     arch = {"arm64": "aarch64", "aarch64": "aarch64", "x86_64": "x86_64", "amd64": "x86_64"}.get(machine)
     target = {"Darwin": f"{arch}-apple-darwin",
-              "Linux": f"{arch}-unknown-linux-gnu"}.get(system)  # TODO: confirm the Linux target name
+              "Linux": f"{arch}-unknown-linux-gnu",  # TODO: confirm the Linux target name
+              "Windows": "x86_64-pc-windows-msvc" if arch == "x86_64" else None}.get(system)
     if not arch or not target:
-        die(f"unsupported platform {system}/{machine}")
+        die(f"no dbt Fusion build for {system}/{machine}. See {FUSION_DOCS}")
     with urllib.request.urlopen(f"{FUSION_CDN}/versions.json", timeout=60) as r:
         tag = json.load(r)["latest"]["tag"]  # e.g. v2.0.9
-    url = f"{FUSION_CDN}/cli/fs-{tag}-{target}.tar.gz"
-    with tempfile.TemporaryDirectory() as tmp:
-        tgz = pathlib.Path(tmp) / "fusion.tar.gz"
-        urllib.request.urlretrieve(url, tgz)
-        with tarfile.open(tgz) as t:
-            if sys.version_info >= (3, 11, 4):
-                t.extractall(tmp, filter="data")
-            else:  # older Python has no extraction filter: validate member paths ourselves
-                root = pathlib.Path(tmp).resolve()
-                for m in t.getmembers():
-                    if m.issym() or m.islnk() or not (root / m.name).resolve().is_relative_to(root):
-                        die(f"refusing suspicious archive member {m.name!r}")
-                t.extractall(tmp)
-        found = [p for p in pathlib.Path(tmp).rglob("dbt") if p.is_file()]
-        if not found:
-            die(f"no dbt binary in {url}")
-        dest = install_binary(found[0].read_bytes(), "dbt")
+    url = f"{FUSION_CDN}/cli/fs-{tag}-{target}.{'zip' if WINDOWS else 'tar.gz'}"
+    with urllib.request.urlopen(url, timeout=600) as r:
+        data = r.read()
+    if WINDOWS:
+        zf = zipfile.ZipFile(io.BytesIO(data))
+        if "dbt.exe" not in zf.namelist():
+            die(f"no dbt.exe in {url}")
+        binary = zf.read("dbt.exe")
+    else:
+        with tarfile.open(fileobj=io.BytesIO(data)) as t:
+            member = next((m for m in t.getmembers() if m.isfile() and pathlib.PurePosixPath(m.name).name == "dbt"), None)
+            if not member:
+                die(f"no dbt binary in {url}")
+            binary = t.extractfile(member).read()  # read in memory: no paths from the archive touch the disk
+    dest = install_binary(binary, f"dbt{EXE}")
     print(f"installed dbt Fusion {tag} ({target}) to {dest}")
+    if WINDOWS:
+        print("If it won't start, install the Microsoft Visual C++ Redistributable (x64), "
+              "or use dbt's PowerShell installer instead (step 1).")
 
 
 def install_binary(data, name):
@@ -334,8 +414,8 @@ OPTIONAL_TABLES = {
 
 def dbt_show(sql, marker):
     """Run one-row SQL on Lake Compute through ./bin/dbtw and return the text after `marker`."""
-    out = subprocess.run([str(ROOT / "bin" / "dbtw"), "show", "--inline", sql, "--limit", "1"],
-                         cwd=ROOT, capture_output=True, text=True, timeout=300)
+    out = subprocess.run([sys.executable, __file__, "dbt", "show", "--inline", sql, "--limit", "1"],
+                         cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
     m = re.search(rf"{marker}([^\s│┆|]*)", out.stdout + out.stderr)
     return m.group(1) if m else None
 
@@ -354,14 +434,14 @@ def preflight(package="fivetran_log"):
             "Run `./bin/dbtw parse` to check the project, then retry.")
     print(f"{len(tables)} tables in {env['LC_CATALOG']}.{env['LOG_SCHEMA']}")
     project = ROOT / "dbt_project.yml"
-    text = project.read_text()
+    text = project.read_text(encoding="utf-8")
     for table, var in OPTIONAL_TABLES[package].items():
         value = "true" if table in tables else "false"
         text, n = re.subn(rf"^(\s*{var}:\s*)\S+", rf"\g<1>{value}", text, flags=re.M)
         if not n:
             die(f"{var} not found in dbt_project.yml")
         print(f"  {var}: {value}  ({table} {'present' if value == 'true' else 'absent'})")
-    project.write_text(text)
+    project.write_text(text, encoding="utf-8")
 
 
 # Rough comparison with a typical cloud data warehouse: billed per second while it runs, using the smallest
@@ -378,7 +458,7 @@ def cost():
     rr = ROOT / "target" / "run_results.json"
     if not rr.exists():
         die("no target/run_results.json yet. Run the build first.")
-    results = json.loads(rr.read_text())
+    results = json.loads(rr.read_text(encoding="utf-8"))
     nodes = [r.get("unique_id", "") for r in results.get("results", [])]
     if not any(n.startswith("model.") for n in nodes):
         die("the last dbt command wasn't a build (run_results.json has no models). "
@@ -411,7 +491,7 @@ def cost():
         "tests_failed": sum(1 for r in rows if kind(r) == "test" and r.get("status") in ("fail", "error")),
         "queries": int(queries), "bytes": int(float(scanned)), "usd": float(usd), "warehouse_usd": warehouse,
         "slowest": [[r["unique_id"].split(".")[-1], round(r.get("execution_time") or 0, 1)] for r in slowest],
-    }, indent=2))
+    }, indent=2), encoding="utf-8")
 
 
 # ---- Step 6: DuckDB --------------------------------------------------------------------------------
@@ -421,16 +501,18 @@ def install_duckdb():
     system, machine = platform.system(), platform.machine().lower()
     asset = {("Darwin", "arm64"): "osx-universal", ("Darwin", "x86_64"): "osx-universal",
              ("Linux", "x86_64"): "linux-amd64", ("Linux", "amd64"): "linux-amd64",
-             ("Linux", "aarch64"): "linux-arm64", ("Linux", "arm64"): "linux-arm64"}.get((system, machine))
+             ("Linux", "aarch64"): "linux-arm64", ("Linux", "arm64"): "linux-arm64",
+             ("Windows", "amd64"): "windows-amd64", ("Windows", "x86_64"): "windows-amd64",
+             ("Windows", "arm64"): "windows-arm64"}.get((system, machine))
     if not asset:
         die(f"unsupported platform {system}/{machine}. Install DuckDB yourself: https://duckdb.org/install")
     name = f"duckdb_cli-{asset}.zip"
     url = f"https://github.com/duckdb/duckdb/releases/download/{DUCKDB_VERSION}/{name}"
     with urllib.request.urlopen(url, timeout=300) as r:
         zf = zipfile.ZipFile(io.BytesIO(r.read()))
-    if "duckdb" not in zf.namelist():
+    if f"duckdb{EXE}" not in zf.namelist():
         die(f"no duckdb binary in {name}")
-    dest = install_binary(zf.read("duckdb"), "duckdb")
+    dest = install_binary(zf.read(f"duckdb{EXE}"), f"duckdb{EXE}")
     print(f"installed DuckDB {DUCKDB_VERSION} to {dest}")
 
 
@@ -442,7 +524,7 @@ def duckdb_check():
             "page in the Fivetran dashboard into .env, then rerun.")
     sql = ("select table_schema, count(*) as tables from information_schema.tables "
            "where table_catalog = 'lake' and table_schema like 'quickstart%' group by 1 order by 1")
-    out = subprocess.run([str(ROOT / "bin" / "lake"), "-c", sql], cwd=ROOT, capture_output=True, text=True,
+    out = subprocess.run([sys.executable, __file__, "lake", "-c", sql], cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace",
                          timeout=300)
     text = redact(out.stdout + out.stderr)
     if out.returncode != 0:
@@ -458,6 +540,9 @@ def duckdb_check():
 
 
 COMMANDS = {
+    "init-env": lambda args: init_env(),
+    "dbt": run_dbt,
+    "lake": run_lake,
     "verify-key": lambda args: verify_key(),
     "destinations": lambda args: destinations(),
     "use-destination": lambda args: use_destination(args[0]) if args else die("usage: use-destination <group_id>"),

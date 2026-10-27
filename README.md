@@ -13,9 +13,10 @@ dashboard or an AI assistant. Then you'll query the results with DuckDB, straigh
 
 ## What you need
 - A Fivetran account
-- A Managed Data Lake destination in that account
+- A Managed Data Lake destination in that account, on AWS S3 in `us-east-1` or `us-west-2` (the regions
+  Lake Compute runs in)
 - A Fivetran API key and secret (*Fivetran dashboard → your user menu → API key*)
-- macOS or Linux with Python 3.9 or later
+- macOS, Linux or Windows (x64), with Python 3.9 or later
 
 ## Follow along in your browser
 ```sh
@@ -41,9 +42,12 @@ Your API secret and tokens go into `.env` in your own editor. You never paste th
 ## By hand
 Run everything from this folder.
 
+**On Windows**, use PowerShell, and in the commands below type `python` instead of `python3`, and
+`.\bin\dbtw` and `.\bin\lake` instead of `./bin/dbtw` and `./bin/lake`.
+
 ### 0. Credentials and destination
 ```sh
-cp .env.example .env && chmod 600 .env
+python3 scripts/lc.py init-env                   # creates .env, readable only by you
 ```
 Open `.env` and fill in `FIVETRAN_API_KEY` and `FIVETRAN_API_SECRET`. Then:
 ```sh
@@ -59,13 +63,18 @@ macOS and Linux:
 curl -fsSL https://public.cdn.getdbt.com/fs/install/install.sh | sh -s -- --update
 exec $SHELL
 ```
+On Windows, in PowerShell, then open a new PowerShell window:
+```powershell
+irm https://public.cdn.getdbt.com/fs/install/install.ps1 | iex
+```
 You don't need `dbt login`. Then check it:
 ```sh
 python3 scripts/lc.py fusion-check
 ```
 Already have a `dbt` you'd rather not replace? `python3 scripts/lc.py install-fusion` installs Fusion
-into `./bin` instead, and the quickstart uses that one. dbt Core (1.x) can stay installed, but it can't
-run Lake Compute.
+into `./bin` instead, and the quickstart uses that one. On Windows that copy needs the Microsoft Visual C++
+Redistributable (x64), which dbt's installer checks for you. dbt Core (1.x) can stay installed, but it
+can't run Lake Compute.
 
 ### 2. Turn on Lake Compute
 In the Fivetran dashboard, open **Destinations → your Managed Data Lake destination** and switch

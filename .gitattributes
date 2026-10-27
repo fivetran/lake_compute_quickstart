@@ -1,0 +1,6 @@
+# Windows wrappers need CRLF; the shell wrappers and scripts need LF.
+*.cmd text eol=crlf
+bin/dbtw text eol=lf
+bin/lake text eol=lf
+*.py text eol=lf
+*.sh text eol=lf

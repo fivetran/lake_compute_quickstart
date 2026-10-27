@@ -7,6 +7,10 @@ lake as Iceberg tables. No dbt platform and no warehouse.
 This folder is the project. Run every command from it. `README.md` has the same steps for people; keep
 the two in step.
 
+**macOS, Linux and Windows (x64) are supported.** The commands below are written for macOS and Linux. On
+Windows, use PowerShell, `python` instead of `python3`, and `.\bin\dbtw` / `.\bin\lake` instead of
+`./bin/dbtw` / `./bin/lake`. Check which OS you're on before giving the user a command.
+
 ## Ground rules
 - **Secrets never go in the chat or a command line.** The user types them into `.env` in their own
   editor. Read `.env` only through `scripts/lc.py`, `bin/dbtw` and `bin/lake`, which never print
@@ -31,11 +35,12 @@ it prints. You and the page read the same state, so a check you run and the page
 
 ## Prerequisites (the user has these before starting)
 - A Fivetran account.
-- A Managed Data Lake destination in it.
+- A Managed Data Lake destination in it, on AWS S3 in `us-east-1` or `us-west-2`. `lc.py destinations`
+  warns about any that aren't.
 - A Fivetran API key and secret (*Fivetran dashboard → user menu → API key*).
 
 ## Step 0: Credentials and destination
-1. `cp .env.example .env && chmod 600 .env`
+1. `python3 scripts/lc.py init-env` creates `.env`, readable only by the user.
 2. Ask the user to fill in `FIVETRAN_API_KEY` and `FIVETRAN_API_SECRET` in `.env` and save.
 3. `python3 scripts/lc.py verify-key` shows the account and key owner. Ask the user to confirm.
 4. `python3 scripts/lc.py destinations` lists Managed Data Lake destinations. Have the user pick one.
@@ -47,10 +52,13 @@ dbt Fusion is the dbt engine that can send models to Lake Compute.
 2. Otherwise install Fusion the way the dbt docs describe
    (https://docs.getdbt.com/docs/local/install-dbt?version=2). On macOS and Linux:
    `curl -fsSL https://public.cdn.getdbt.com/fs/install/install.sh | sh -s -- --update`, then `exec $SHELL`.
+   On Windows, in PowerShell: `irm https://public.cdn.getdbt.com/fs/install/install.ps1 | iex`, then a new
+   PowerShell window.
    **Skip `dbt login`**: this quickstart doesn't use the dbt platform.
    - The installer puts `dbt` in `~/.local/bin` and adds it to the PATH. If the user already has a `dbt`
      there they want to keep, use `python3 scripts/lc.py install-fusion` instead: it installs into
-     `./bin` only. Ask which they prefer.
+     `./bin` only. Ask which they prefer. On Windows, prefer dbt's installer: it also checks for the
+     Microsoft Visual C++ Redistributable that Fusion needs.
    - dbt Core (1.x) can't run Lake Compute. If it's installed, leave it; the quickstart won't use it.
 3. `python3 scripts/lc.py fusion-check` again.
 
